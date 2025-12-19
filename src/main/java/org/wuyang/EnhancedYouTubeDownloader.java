@@ -28,7 +28,7 @@ public class EnhancedYouTubeDownloader {
             createOutputDirectory();
             ensureYtDlpExists();
 
-            System.out.println("=== 增强版YouTube视频下载器（支持4K/反机器人验证） ===");
+            System.out.println("=== 增强版YouTube视频下载器（支持4K/音视频合并/反机器人验证） ===");
             String videoUrl = getVideoUrl(scanner);
 
             // 获取并解析格式列表（带反机器人验证）
@@ -39,10 +39,10 @@ public class EnhancedYouTubeDownloader {
             } else {
                 // 显示格式列表并特别标注4K格式
                 displayFormatsWith4KHighlight(formats);
-                String selectedFormat = getFormatChoiceWith4KRecommendation(scanner, formats);
+                String selectedFormat = getFormatChoiceWithAudioRecommendation(scanner, formats);
 
-                // 执行下载（带反机器人验证）
-                downloadWithRetryAndAntiBot(videoUrl, selectedFormat, MAX_RETRIES);
+                // 执行下载（带音视频合并和反机器人验证）
+                downloadWithRetryAndAudioMerging(videoUrl, selectedFormat, MAX_RETRIES);
             }
 
             openExplorer();
@@ -73,6 +73,7 @@ public class EnhancedYouTubeDownloader {
         final String codec;
         final boolean is4K;
         final boolean isHD;
+        final boolean isAudioOnly;
 
         VideoFormat(String formatId, String extension, String resolution, String fps,
                     String fileSize, String bitrate, String codec) {
@@ -88,11 +89,12 @@ public class EnhancedYouTubeDownloader {
             String resolutionLower = resolution.toLowerCase();
             this.is4K = UHD_FORMATS.stream().anyMatch(resolutionLower::contains);
             this.isHD = HD_FORMATS.stream().anyMatch(resolutionLower::contains) || this.is4K;
+            this.isAudioOnly = resolutionLower.contains("audio") || codec.toLowerCase().contains("audio");
         }
 
         @Override
         public String toString() {
-            String prefix = is4K ? "🎯 " : (isHD ? "📺 " : "    ");
+            String prefix = isAudioOnly ? "🎵 " : (is4K ? "🎯 " : (isHD ? "📺 " : "    "));
             return String.format("%s%-8s %-4s %-10s %-4s | %-10s %-6s | %s",
                     prefix, formatId, extension, resolution, fps, fileSize, bitrate, codec);
         }
@@ -103,7 +105,7 @@ public class EnhancedYouTubeDownloader {
     }
 
     /**
-     * 带反机器人验证的格式获取
+     * 恢复：带反机器人验证的格式获取
      */
     private static List<VideoFormat> getAvailableFormatsWithAntiBot(String videoUrl) throws DownloadException {
         System.out.println("\n正在获取可用格式（带反机器人验证）...");
@@ -133,7 +135,7 @@ public class EnhancedYouTubeDownloader {
     }
 
     /**
-     * 备用格式获取方法
+     * 恢复：备用格式获取方法
      */
     private static List<VideoFormat> getAvailableFormatsFallback(String videoUrl) throws DownloadException {
         try {
@@ -185,13 +187,13 @@ public class EnhancedYouTubeDownloader {
     }
 
     /**
-     * 构建反机器人验证命令基础
+     * 恢复：构建反机器人验证命令基础
      */
     private static List<String> buildAntiBotCommand() {
         List<String> command = new ArrayList<>();
         command.add(YT_DLP_PATH);
 
-        // 添加反机器人验证参数
+        // 添加反机器人验证参数[3](@ref)
         command.add("--user-agent");
         command.add(USER_AGENT);
         command.add("--referer");
@@ -295,23 +297,26 @@ public class EnhancedYouTubeDownloader {
     }
 
     /**
-     * 高亮显示4K格式
+     * 高亮显示4K格式和音频格式
      */
     private static void displayFormatsWith4KHighlight(List<VideoFormat> formats) {
-        System.out.println("\n" + "=".repeat(100));
-        System.out.println("可用的视频格式 (🎯 = 4K/UHD, 📺 = HD, 空白 = 标清)");
-        System.out.println("=".repeat(100));
+        System.out.println("\n" + "=".repeat(120));
+        System.out.println("可用的视频格式 (🎯 = 4K/UHD, 📺 = HD, 🎵 = 音频, 空白 = 标清)");
+        System.out.println("=".repeat(120));
         System.out.printf("%-8s %-4s %-12s %-4s %-12s %-8s %s%n",
                 "ID", "EXT", "分辨率", "FPS", "大小", "码率", "编码");
-        System.out.println("-".repeat(100));
+        System.out.println("-".repeat(120));
 
-        // 先显示4K格式
+        // 分类格式
         List<VideoFormat> uhdFormats = new ArrayList<>();
         List<VideoFormat> hdFormats = new ArrayList<>();
         List<VideoFormat> sdFormats = new ArrayList<>();
+        List<VideoFormat> audioFormats = new ArrayList<>();
 
         for (VideoFormat format : formats) {
-            if (format.is4K) {
+            if (format.isAudioOnly) {
+                audioFormats.add(format);
+            } else if (format.is4K) {
                 uhdFormats.add(format);
             } else if (format.isHD) {
                 hdFormats.add(format);
@@ -344,11 +349,19 @@ public class EnhancedYouTubeDownloader {
             }
         }
 
-        System.out.println("=".repeat(100));
+        // 显示音频格式
+        if (!audioFormats.isEmpty()) {
+            System.out.println("\n🎵 音频格式:");
+            for (VideoFormat format : audioFormats) {
+                System.out.println(format);
+            }
+        }
+
+        System.out.println("=".repeat(120));
 
         // 统计信息
-        System.out.printf("找到 %d 个4K格式, %d 个HD格式, %d 个标清格式%n",
-                uhdFormats.size(), hdFormats.size(), sdFormats.size());
+        System.out.printf("找到 %d 个4K格式, %d 个HD格式, %d 个标清格式, %d 个音频格式%n",
+                uhdFormats.size(), hdFormats.size(), sdFormats.size(), audioFormats.size());
 
         if (uhdFormats.isEmpty()) {
             System.out.println("⚠ 未找到4K格式，视频可能不支持4K或需要特殊访问权限");
@@ -356,12 +369,23 @@ public class EnhancedYouTubeDownloader {
     }
 
     /**
-     * 带4K推荐的格式选择
+     * 带音频推荐的格式选择
      */
-    private static String getFormatChoiceWith4KRecommendation(Scanner scanner, List<VideoFormat> formats) {
+    private static String getFormatChoiceWithAudioRecommendation(Scanner scanner, List<VideoFormat> formats) {
+        // 查找最佳音频格式
+        List<VideoFormat> audioFormats = formats.stream()
+                .filter(f -> f.isAudioOnly)
+                .sorted((f1, f2) -> {
+                    // 按音频质量排序（比特率高的优先）
+                    int quality1 = extractBitrateValue(f1.bitrate);
+                    int quality2 = extractBitrateValue(f2.bitrate);
+                    return Integer.compare(quality2, quality1);
+                })
+                .toList();
+
         // 查找4K格式
         List<VideoFormat> uhdFormats = formats.stream()
-                .filter(f -> f.is4K)
+                .filter(f -> f.is4K && !f.isAudioOnly)
                 .sorted((f1, f2) -> {
                     // 按分辨率排序（2160 > 1440）
                     int res1 = extractResolutionValue(f1.resolution);
@@ -372,7 +396,7 @@ public class EnhancedYouTubeDownloader {
 
         // 查找最佳HD格式
         List<VideoFormat> hdFormats = formats.stream()
-                .filter(f -> f.isHD && !f.is4K)
+                .filter(f -> f.isHD && !f.is4K && !f.isAudioOnly)
                 .sorted((f1, f2) -> {
                     int res1 = extractResolutionValue(f1.resolution);
                     int res2 = extractResolutionValue(f2.resolution);
@@ -380,35 +404,34 @@ public class EnhancedYouTubeDownloader {
                 })
                 .toList();
 
+        String bestAudioId = audioFormats.isEmpty() ? "bestaudio" : audioFormats.get(0).formatId;
+
         while (true) {
-            System.out.println("\n请选择下载选项:");
+            System.out.println("\n🎵 请选择下载选项（支持音视频合并）:");
 
-            // 显示4K推荐（如果有）
+            // 显示智能推荐组合
+            System.out.println("🚀 智能推荐组合:");
             if (!uhdFormats.isEmpty()) {
-                System.out.println("🎯 4K选项:");
-                for (int i = 0; i < Math.min(uhdFormats.size(), 3); i++) {
-                    VideoFormat format = uhdFormats.get(i);
-                    System.out.printf("  %d. 格式 %s%n", i + 1, format.toSimpleString());
-                }
+                System.out.println("  1. 最佳4K视频 + 最佳音频 (推荐)");
             }
-
-            // 显示HD选项
             if (!hdFormats.isEmpty()) {
-                System.out.println("📺 HD选项:");
-                int startIndex = uhdFormats.isEmpty() ? 1 : uhdFormats.size() + 1;
-                for (int i = 0; i < Math.min(hdFormats.size(), 3); i++) {
-                    VideoFormat format = hdFormats.get(i);
-                    System.out.printf("  %d. 格式 %s%n", startIndex + i, format.toSimpleString());
-                }
+                int index = uhdFormats.isEmpty() ? 1 : 2;
+                System.out.printf("  %d. 最佳1080p视频 + 最佳音频%n", index);
             }
+            System.out.println("  A. 自动选择最佳视频+音频组合");
 
-            System.out.println("\n快捷选项:");
-            System.out.println("  best    - 下载最佳质量");
-            System.out.println("  best4k  - 下载最佳4K质量（如果可用）");
-            System.out.println("  besthd  - 下载最佳HD质量");
-            System.out.println("  worst   - 下载最差质量");
-            System.out.println("  auto    - 自动选择最佳可用格式");
-            System.out.println("  或直接输入格式ID (如: 301-1)");
+            // 显示高级选项
+            System.out.println("\n🎯 高级选项:");
+            System.out.println("  B. 仅下载最佳视频（无音频）");
+            System.out.println("  C. 仅下载最佳音频");
+            System.out.println("  D. 自定义视频格式 + 最佳音频");
+
+            // 显示快捷命令
+            System.out.println("\n💡 快捷命令:");
+            System.out.println("  best     - 最佳视频+音频组合");
+            System.out.println("  4k       - 最佳4K视频+最佳音频");
+            System.out.println("  hd       - 最佳高清视频+最佳音频");
+            System.out.println("  audio    - 仅最佳音频");
 
             System.out.print("\n请输入您的选择: ");
             String choice = scanner.nextLine().trim().toLowerCase();
@@ -418,74 +441,124 @@ public class EnhancedYouTubeDownloader {
                 continue;
             }
 
-            // 处理快捷选项
+            // 处理智能推荐组合
+            switch (choice) {
+                case "1":
+                    if (!uhdFormats.isEmpty()) {
+                        return uhdFormats.get(0).formatId + "+" + bestAudioId + "/best[height<=2160]";
+                    }
+                    break;
+                case "2":
+                    if (!hdFormats.isEmpty()) {
+                        return hdFormats.get(0).formatId + "+" + bestAudioId + "/best[height<=1080]";
+                    }
+                    break;
+                case "a":
+                case "auto":
+                    return getAutoFormatChoiceWithAudio(uhdFormats, hdFormats, formats, bestAudioId);
+                case "b":
+                    return "bestvideo";
+                case "c":
+                case "audio":
+                    return "bestaudio";
+                case "d":
+                    return getCustomVideoFormat(scanner, formats) + "+" + bestAudioId;
+            }
+
+            // 处理快捷命令
             switch (choice) {
                 case "best":
-                    return "best[height<=2160]";
-                case "best4k":
-                    if (!uhdFormats.isEmpty()) {
-                        return uhdFormats.get(0).formatId;
+                    return "bestvideo+" + bestAudioId + "/best";
+                case "4k":
+                    return "bestvideo[height<=2160]+" + bestAudioId + "/best[height<=2160]";
+                case "hd":
+                    return "bestvideo[height<=1080]+" + bestAudioId + "/best[height<=1080]";
+                default:
+                    // 检查是否是直接格式ID
+                    if (isValidFormatId(choice, formats)) {
+                        VideoFormat selectedFormat = formats.stream()
+                                .filter(f -> f.formatId.equals(choice))
+                                .findFirst()
+                                .orElse(null);
+
+                        if (selectedFormat != null) {
+                            if (selectedFormat.isAudioOnly) {
+                                return choice; // 直接返回音频格式ID
+                            } else {
+                                return choice + "+" + bestAudioId; // 视频格式加上最佳音频
+                            }
+                        }
                     } else {
-                        System.out.println("❌ 未找到4K格式，请选择其他选项");
+                        System.out.println("❌ 无效的选择或格式ID，请重新输入");
                         continue;
                     }
-                case "besthd":
-                    if (!hdFormats.isEmpty()) {
-                        return hdFormats.get(0).formatId;
-                    } else if (!formats.isEmpty()) {
-                        return formats.get(0).formatId;
-                    } else {
-                        return "best[height<=1080]";
-                    }
-                case "worst":
-                    return "worst";
-                case "auto":
-                    return getAutoFormatChoice(uhdFormats, hdFormats, formats);
-                default:
-                    // 检查是否是数字选择
-                    try {
-                        int index = Integer.parseInt(choice);
-                        if (index >= 1 && index <= uhdFormats.size()) {
-                            return uhdFormats.get(index - 1).formatId;
-                        } else if (index > uhdFormats.size() &&
-                                index <= uhdFormats.size() + hdFormats.size()) {
-                            return hdFormats.get(index - uhdFormats.size() - 1).formatId;
-                        } else {
-                            System.out.println("❌ 数字超出范围，请重新选择");
-                            continue;
-                        }
-                    } catch (NumberFormatException e) {
-                        // 不是数字，可能是直接格式ID
-                        if (isValidFormatId(choice, formats)) {
-                            return choice;
-                        } else {
-                            System.out.println("❌ 无效的格式ID或选择，请重新输入");
-                            continue;
-                        }
-                    }
+            }
+
+            return choice;
+        }
+    }
+
+    /**
+     * 自定义视频格式选择
+     */
+    private static String getCustomVideoFormat(Scanner scanner, List<VideoFormat> formats) {
+        while (true) {
+            System.out.print("请输入视频格式ID: ");
+            String formatId = scanner.nextLine().trim();
+
+            if (isValidFormatId(formatId, formats)) {
+                VideoFormat format = formats.stream()
+                        .filter(f -> f.formatId.equals(formatId))
+                        .findFirst()
+                        .orElse(null);
+
+                if (format != null && !format.isAudioOnly) {
+                    return formatId;
+                } else {
+                    System.out.println("❌ 请输入有效的视频格式ID（非音频格式）");
+                }
+            } else {
+                System.out.println("❌ 无效的格式ID，请重新输入");
             }
         }
     }
 
     /**
-     * 自动选择最佳格式
+     * 自动选择最佳格式（带音频）
      */
-    private static String getAutoFormatChoice(List<VideoFormat> uhdFormats,
-                                              List<VideoFormat> hdFormats,
-                                              List<VideoFormat> allFormats) {
+    private static String getAutoFormatChoiceWithAudio(List<VideoFormat> uhdFormats,
+                                                       List<VideoFormat> hdFormats,
+                                                       List<VideoFormat> allFormats,
+                                                       String bestAudioId) {
         if (!uhdFormats.isEmpty()) {
-            System.out.println("✅ 自动选择: " + uhdFormats.get(0).toSimpleString());
-            return uhdFormats.get(0).formatId;
+            System.out.println("✅ 自动选择: 最佳4K视频 + 最佳音频");
+            return "bestvideo[height<=2160]+" + bestAudioId + "/best[height<=2160]";
         } else if (!hdFormats.isEmpty()) {
-            System.out.println("✅ 自动选择: " + hdFormats.get(0).toSimpleString());
-            return hdFormats.get(0).formatId;
-        } else if (!allFormats.isEmpty()) {
-            System.out.println("✅ 自动选择: " + allFormats.get(0).toSimpleString());
-            return allFormats.get(0).formatId;
+            System.out.println("✅ 自动选择: 最佳1080p视频 + 最佳音频");
+            return "bestvideo[height<=1080]+" + bestAudioId + "/best[height<=1080]";
         } else {
-            System.out.println("✅ 自动选择: 最佳可用质量");
-            return "best";
+            System.out.println("✅ 自动选择: 最佳视频 + 最佳音频");
+            return "bestvideo+" + bestAudioId + "/best";
         }
+    }
+
+    /**
+     * 提取比特率数值
+     */
+    private static int extractBitrateValue(String bitrate) {
+        if (bitrate == null || bitrate.equals("N/A")) return 0;
+
+        try {
+            if (bitrate.contains("k")) {
+                return Integer.parseInt(bitrate.replace("k", "").trim());
+            }
+            if (bitrate.contains("K")) {
+                return Integer.parseInt(bitrate.replace("K", "").trim());
+            }
+        } catch (NumberFormatException e) {
+            // 忽略解析错误
+        }
+        return 0;
     }
 
     /**
@@ -515,23 +588,23 @@ public class EnhancedYouTubeDownloader {
      * 直接下载（当无法解析格式时使用）
      */
     private static void directDownload(String videoUrl) throws DownloadException {
-        System.out.println("正在使用默认设置下载...");
-        downloadVideoWithAntiBot(videoUrl, "best[height<=2160]");
+        System.out.println("正在使用默认设置下载（最佳视频+音频）...");
+        downloadVideoWithAudioMerging(videoUrl, "bestvideo+bestaudio/best");
     }
 
     /**
-     * 带重试机制和反机器人验证的下载
+     * 恢复：带重试机制和音视频合并的下载[5,10](@ref)
      */
-    private static void downloadWithRetryAndAntiBot(String videoUrl, String format, int maxRetries)
+    private static void downloadWithRetryAndAudioMerging(String videoUrl, String format, int maxRetries)
             throws DownloadException {
 
         DownloadException lastException = null;
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                System.out.printf("\n尝试下载 (第%d次/%d次)...\n", attempt, maxRetries);
-                downloadVideoWithAntiBot(videoUrl, format);
-                System.out.println("✓ 下载完成！");
+                System.out.printf("\n🎵 尝试下载和合并音视频 (第%d次/%d次)...\n", attempt, maxRetries);
+                downloadVideoWithAudioMerging(videoUrl, format);
+                System.out.println("✅ 下载和合并完成！");
                 return;
 
             } catch (DownloadException e) {
@@ -556,23 +629,44 @@ public class EnhancedYouTubeDownloader {
     }
 
     /**
-     * 带反机器人验证的视频下载
+     * 恢复：带音视频合并的视频下载
      */
-    private static void downloadVideoWithAntiBot(String videoUrl, String format) throws DownloadException {
+    private static void downloadVideoWithAudioMerging(String videoUrl, String format) throws DownloadException {
         System.out.println("下载配置: " + format);
 
         try {
             List<String> command = buildAntiBotCommand();
+
+            // 设置格式选择
             command.add("-f");
             command.add(format);
+
+            // 设置合并输出格式
             command.add("--merge-output-format");
             command.add("mp4");
+
+            // 音频质量设置
+            command.add("--audio-quality");
+            command.add("0"); // 最佳质量
+            command.add("--audio-format");
+            command.add("mp3");
+
+            // 输出模板
             command.add("-o");
-            command.add(OUTPUT_DIR + File.separator + "%(title)s.%(ext)s");
+            command.add(OUTPUT_DIR + File.separator + "%(title)s [%(resolution)s][%(fps)s].%(ext)s");
+
+            // 合并后删除临时文件
+            command.add("--no-keep-video");
+
+            // 添加元数据
+            command.add("--embed-thumbnail");
+            command.add("--add-metadata");
+
+            // 其他参数
             command.add("--no-overwrites");
             command.add("--console-title");
 
-            // 添加重试参数
+            // 添加重试参数[5](@ref)
             command.add("--retries");
             command.add("10");
             command.add("--fragment-retries");
@@ -585,7 +679,7 @@ public class EnhancedYouTubeDownloader {
                     .redirectErrorStream(true)
                     .start();
 
-            printProcessOutput(process, "下载进度");
+            printProcessOutput(process, "下载和合并进度");
 
             int exitCode = process.waitFor();
             if (exitCode != 0) {
