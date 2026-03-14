@@ -22,9 +22,8 @@ public class EnhancedYouTubeDownloader {
     private static final Set<String> HD_FORMATS = Set.of("1080", "1080p", "720", "720p", "hd");
 
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
 
-        try {
+        try (Scanner scanner = new Scanner(System.in)) {
             createOutputDirectory();
             ensureYtDlpExists();
 
@@ -55,8 +54,6 @@ public class EnhancedYouTubeDownloader {
         } catch (Exception e) {
             System.err.println("发生意外错误: " + e.getMessage());
             e.printStackTrace();
-        } finally {
-            scanner.close();
         }
     }
 
