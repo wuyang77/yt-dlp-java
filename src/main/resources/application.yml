@@ -1,0 +1,51 @@
+# =====================================================
+# Spring Boot 应用配置
+# =====================================================
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: yt-dlp-java
+  threads:
+    virtual:
+      enabled: true  # 启用虚拟线程（JDK 21+），提升 IO 密集型并发能力
+
+# =====================================================
+# yt-dlp-java 业务配置
+# =====================================================
+ytdlp:
+  # 输出目录
+  output:
+    dir: F:/学习资料/套图/打碟
+    template: "%(title).80B [%(height)sp].%(ext)s"
+
+  # yt-dlp 相关路径
+  bin:
+    yt-dlp: src/main/resources/yt-dlp.exe
+    ffmpeg: src/main/resources/ffmpeg.exe
+    cookies: src/main/resources/cookies.txt
+    node: D:/dev/nvm/nodejs/node.exe
+
+  # PO Token Provider
+  pot:
+    path: src/main/resources/bgutil-pot.exe
+    port: 49300
+    download-url: https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/latest/download/bgutil-pot-windows-x86_64.exe
+
+  # HTTP 头
+  http:
+    user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    referer: https://www.youtube.com/
+
+  # YouTube 客户端策略（按优先级排列）
+  youtube:
+    clients: web_embedded,tv,tv_downgraded,mweb,android_vr
+
+  # 下载参数
+  download:
+    retries: 3

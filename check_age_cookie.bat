@@ -1,1 +1,0 @@
-check_age_cookie.bat
