@@ -21,7 +21,7 @@
 
 本项目是一个基于 **Spring Boot 3.5.16** 构建的 YouTube 视频下载服务。它通过封装 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 命令行工具，提供 RESTful API 接口，支持以下核心功能：
 
-- 自动遍历多个 YouTube 客户端（`web_embedded`、`tv`、`mweb` 等）获取完整格式列表
+- 自动遍历多个 YouTube 客户端（`web_embedded`、`tv`、`tv_downgraded`、`android_vr`）获取可用格式列表
 - 集成 [bgutil-ytdlp-pot-provider](https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs) 解决 PO Token 限制，获取高清格式
 - 自动选取最高码率的视频流和音频流，合并输出为 MP4
 - 支持仅视频、仅音频、指定格式 ID 等多种下载模式
@@ -159,7 +159,7 @@ ytdlp:
 
   # --- YouTube 客户端策略 ---
   youtube:
-    clients: web_embedded,tv,tv_downgraded,mweb,android_vr
+    clients: web_embedded,tv,tv_downgraded,android_vr
 
   # --- 下载参数 ---
   download:

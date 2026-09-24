@@ -1,6 +1,8 @@
 package org.wuyang.ytdlp.service;
 
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.wuyang.ytdlp.config.YtDlpProperties;
 
 import java.io.IOException;
@@ -28,6 +30,8 @@ import java.util.concurrent.TimeUnit;
  */
 @Component
 public class PotProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(PotProvider.class);
 
     private static final int MAX_WAIT_ATTEMPTS = 10;
     private static final int WAIT_INTERVAL_MS = 500;
@@ -60,8 +64,10 @@ public class PotProvider {
     /** 确保二进制存在，不存在则自动下载 */
     public void ensureBinary() {
         if (Files.exists(Path.of(exePath))) {
+            log.debug("event=pot.binary_present path={}", exePath);
             return;
         }
+        log.info("event=pot.binary_download_start url={} path={}", downloadUrl, exePath);
         try {
             HttpURLConnection conn = (HttpURLConnection) URI.create(downloadUrl).toURL().openConnection();
             conn.setInstanceFollowRedirects(true);
@@ -71,7 +77,8 @@ public class PotProvider {
             }
         } catch (IOException e) {
             // 下载失败不中断应用启动，后续降级运行
-            System.err.println("[PotProvider] 下载失败: " + e.getMessage());
+            log.error("event=pot.binary_download_failed url={} path={} message={}",
+                    downloadUrl, exePath, e.getMessage(), e);
         }
     }
 
@@ -81,9 +88,11 @@ public class PotProvider {
 
         if (ping()) {
             ready = true;
+            log.info("event=pot.ready endpoint={}", baseUrl);
             return;
         }
 
+        log.info("event=pot.start endpoint={} path={}", baseUrl, exePath);
         try {
             ProcessBuilder pb = new ProcessBuilder(
                     Path.of(exePath).toString(),
@@ -96,12 +105,13 @@ public class PotProvider {
                 Thread.sleep(WAIT_INTERVAL_MS);
                 if (ping()) {
                     ready = true;
+                    log.info("event=pot.ready endpoint={} attempts={}", baseUrl, i + 1);
                     return;
                 }
             }
-            System.err.println("[PotProvider] 启动但未响应 /ping");
+            log.error("event=pot.start_timeout endpoint={} attempts={}", baseUrl, MAX_WAIT_ATTEMPTS);
         } catch (Exception e) {
-            System.err.println("[PotProvider] 启动异常: " + e.getMessage());
+            log.error("event=pot.start_failed endpoint={} message={}", baseUrl, e.getMessage(), e);
         }
     }
 
@@ -113,6 +123,7 @@ public class PotProvider {
                 process.waitFor(3, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                log.warn("event=pot.stop_interrupted endpoint={} message={}", baseUrl, e.getMessage(), e);
             }
         }
     }
@@ -128,6 +139,7 @@ public class PotProvider {
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
             return resp.statusCode() == 200;
         } catch (Exception e) {
+            log.debug("event=pot.healthcheck_failed endpoint={} message={}", baseUrl, e.getMessage());
             return false;
         }
     }

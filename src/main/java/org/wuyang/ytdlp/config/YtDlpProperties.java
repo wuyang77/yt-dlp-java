@@ -54,18 +54,20 @@ public record YtDlpProperties(
     /**
      * HTTP 头配置
      *
-     * @param userAgent User-Agent
-     * @param referer   Referer
+      * @param userAgent 浏览器标识
+      * @param referer   来源地址
+      * @param proxy     可选代理地址
      */
-    public record Http(String userAgent, String referer) {
+     public record Http(String userAgent, String referer, String proxy) {
     }
 
     /**
      * YouTube 策略配置
      *
-     * @param clients 客户端列表（逗号分隔）
+        * @param clients     客户端列表（逗号分隔）
+        * @param parallelism 格式探测并发数
      */
-    public record Youtube(String clients) {
+    public record Youtube(String clients, int parallelism) {
 
         /** 获取客户端数组 */
         public String[] clientArray() {
@@ -76,8 +78,13 @@ public record YtDlpProperties(
     /**
      * 下载参数配置
      *
-     * @param retries 重试次数
+        * @param retries         提取和下载重试次数
+        * @param fragmentRetries 媒体分片重试次数
+        * @param httpRetries     文件访问重试次数
+        * @param httpChunkSize   HTTP 分块大小，0 表示不启用
+        * @param forceIpv4       是否强制使用 IPv4
      */
-    public record Download(int retries) {
+    public record Download(int retries, int fragmentRetries, int httpRetries,
+                          int httpChunkSize, boolean forceIpv4) {
     }
 }

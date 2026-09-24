@@ -7,6 +7,7 @@ public record DownloadTask(
         String taskId,
         String status,
         double progress,
+        String speed,
         String stage,
         String message,
         DownloadResponse result,

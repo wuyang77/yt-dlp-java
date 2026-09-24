@@ -3,42 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clipforge · yt-dlp 下载台</title>
+  <title>视频探测下载 · 媒体下载工作室</title>
   <script src="/vendor/vue.global.prod.js"></script>
   <style>
-    :root { --ink:#0f0f0f; --muted:#606060; --paper:#f9f9f9; --card:#fff; --line:#e5e5e5; --red:#ff0033; --red-dark:#cc0029; --green:#137333; --shadow:0 2px 12px rgba(0,0,0,.08); }
+    :root { --ink:#f5fffd; --muted:#b3ceca; --paper:#081416; --card:#102326; --line:#315457; --red:#4de2bd; --red-dark:#9af7e1; --green:#9af7e1; --shadow:0 16px 42px rgba(0,0,0,.24); }
     * { box-sizing:border-box; }
-    body { height:100vh; margin:0; overflow:hidden; color:var(--ink); background:var(--paper); font-family:'Segoe UI','Noto Sans SC','Noto Sans',Arial,sans-serif; }
+    body { height:100vh; margin:0; overflow:hidden; color:var(--ink); background:radial-gradient(circle at 85% 8%,#173c3b 0,transparent 30%),linear-gradient(135deg,#081416 0%,#0c1f22 55%,#102d2d 100%); font-family:'Segoe UI','Noto Sans SC','Noto Sans',Arial,sans-serif; }
     button, input, select { font:inherit; }
     button { cursor:pointer; border:0; }
     .shell { width:min(1380px, calc(100% - 40px)); height:100vh; margin:0 auto; padding:0 0 14px; display:flex; flex-direction:column; }
     .topbar { flex:0 0 64px; display:grid; grid-template-columns:220px minmax(280px, 680px) 220px; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); }
     .brand { display:flex; align-items:center; gap:9px; font-weight:700; letter-spacing:-.03em; }
-    .brand-mark { display:grid; place-items:center; width:34px; height:24px; background:var(--red); color:#fff; border-radius:6px; font-size:17px; }
+    .brand-mark { display:grid; place-items:center; width:34px; height:24px; background:var(--red); color:#071715; border-radius:6px; font-size:17px; box-shadow:0 0 24px rgba(56,214,176,.35); }
     .brand-sub { color:var(--muted); font-size:11px; font-weight:500; margin-left:2px; }
     .top-search { display:flex; height:38px; }
-    .top-search input { border-radius:20px 0 0 20px; padding:9px 16px; background:#fff; }
-    .top-search button { width:52px; border:1px solid var(--line); border-left:0; border-radius:0 20px 20px 0; background:#f2f2f2; color:var(--ink); }
+    .top-search input { border-radius:20px 0 0 20px; padding:9px 16px; background:#122a2c; color:var(--ink); }
+    .top-search button { border:1px solid var(--line); border-left:0; background:#173537; color:var(--ink); }
+    .top-search .paste-button { width:64px; }
+    .top-search .inspect-button { width:52px; border-radius:0 20px 20px 0; }
     .status { justify-self:end; display:flex; align-items:center; gap:8px; color:var(--muted); font:11px Consolas,'Noto Sans Mono',monospace; }
-    .status-dot { width:8px; height:8px; border-radius:50%; background:#2ba24c; }
+    .status-dot { width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 12px var(--red); }
     .hero { flex:0 0 92px; display:flex; justify-content:space-between; align-items:center; gap:30px; padding:12px 0 14px; }
     h1 { max-width:650px; margin:0; font-size:clamp(25px, 3vw, 38px); line-height:1.08; letter-spacing:-.055em; }
     .hero p { max-width:510px; color:var(--muted); line-height:1.45; margin:0; font-size:13px; }
     .hero-kicker { color:var(--red-dark); font:10px Consolas,'Noto Sans Mono',monospace; text-transform:uppercase; letter-spacing:.1em; margin-bottom:6px; }
-    .workspace { flex:1; min-height:0; display:grid; grid-template-columns:300px 1fr; gap:22px; align-items:stretch; }
-    .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); }
-    .control { height:max-content; padding:18px; }
+    .workspace { flex:1; min-height:0; display:grid; grid-template-columns:240px minmax(0, 1fr); gap:16px; align-items:stretch; }
+    .panel { background:rgba(16,35,38,.88); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); backdrop-filter:blur(14px); }
+    .control { height:max-content; padding:15px; }
     .eyebrow { color:var(--muted); font:10px Consolas,'Noto Sans Mono',monospace; text-transform:uppercase; letter-spacing:.1em; }
     label { display:block; margin:17px 0 7px; font-size:13px; font-weight:600; }
-    input, select { width:100%; border:1px solid #cfcfcf; border-radius:4px; background:#fff; color:var(--ink); padding:11px 12px; outline:none; }
+    input, select { width:100%; border:1px solid var(--line); border-radius:4px; background:#122a2c; color:var(--ink); padding:11px 12px; outline:none; }
     input:focus, select:focus { border-color:var(--ink); box-shadow:0 0 0 1px var(--ink); }
-    .primary { width:100%; margin-top:18px; padding:12px 16px; border-radius:4px; background:var(--red); color:#fff; font-weight:700; transition:background .18s; }
+    .primary { width:100%; margin-top:18px; padding:12px 16px; border-radius:4px; background:var(--red); color:#071715; font-weight:700; transition:background .18s,transform .18s; }
     .primary:hover { background:var(--red-dark); }
     .primary:disabled { cursor:wait; opacity:.5; transform:none; }
     .hint { color:var(--muted); font-size:12px; line-height:1.55; margin:13px 0 0; }
     .content { min-width:0; min-height:0; display:flex; flex-direction:column; gap:14px; }
     .empty { min-height:0; flex:1; display:grid; place-items:center; text-align:center; padding:30px; }
-    .empty-icon { display:grid; place-items:center; width:70px; height:70px; margin:0 auto 16px; border-radius:50%; background:#f2f2f2; color:#8a8a8a; font-size:34px; }
+    .empty-icon { display:grid; place-items:center; width:70px; height:70px; margin:0 auto 16px; border-radius:50%; background:#173c3b; color:var(--red); font-size:34px; box-shadow:0 0 30px rgba(56,214,176,.16); }
     .empty h2 { margin:0 0 9px; letter-spacing:-.04em; font-size:21px; }
     .empty p { color:var(--muted); margin:0; }
     .format-panel { min-height:0; flex:1; display:flex; flex-direction:column; }
@@ -46,35 +48,38 @@
     .format-head h2 { margin:0; font-size:20px; letter-spacing:-.04em; }
     .pill { border-radius:4px; padding:5px 8px; background:#fce8ec; color:var(--red-dark); font:10px 'Roboto Mono',monospace; }
     .picks { display:grid; grid-template-columns:1fr 1fr; gap:12px; flex:0 0 88px; padding:12px 20px; }
-    .pick { border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:#fafafa; }
+    .pick { border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:#122a2c; }
     .pick.active { border-color:#f1a7b5; box-shadow:inset 0 0 0 1px var(--red); background:#fffafb; }
     .pick-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
     .pick-title { font-size:12px; color:var(--muted); }
     .pick strong { font-size:17px; }
     .pick select { padding:9px 10px; font-size:13px; }
-    .table-wrap { flex:1; min-height:0; overflow:scroll; overscroll-behavior:contain; scrollbar-gutter:stable both-edges; border-top:1px solid #f0f0f0; }
+    .download-mode { margin-top:18px; }
+    .download-mode select { margin-top:7px; }
+    .table-wrap { flex:1; min-height:0; overflow:scroll; overscroll-behavior:contain; scrollbar-gutter:stable both-edges; border-top:1px solid var(--line); }
     .table-wrap::-webkit-scrollbar { width:12px; height:12px; }
     .table-wrap::-webkit-scrollbar-track { background:#f5f5f5; }
     .table-wrap::-webkit-scrollbar-thumb { border:3px solid #f5f5f5; border-radius:10px; background:#b9b9b9; }
     .table-wrap::-webkit-scrollbar-thumb:hover { background:#888; }
     table { width:100%; border-collapse:separate; border-spacing:0; font-size:12px; min-width:680px; }
-    th { position:sticky; top:0; z-index:1; color:var(--muted); background:#fff; text-align:left; font:10px Consolas,'Noto Sans Mono',monospace; text-transform:uppercase; padding:11px 20px; border-bottom:1px solid var(--line); }
+    th { position:sticky; top:0; z-index:1; color:var(--muted); background:#102326; text-align:left; font:10px Consolas,'Noto Sans Mono',monospace; padding:11px 20px; border-bottom:1px solid var(--line); }
     td { border-top:1px solid #edf0eb; padding:11px 20px; white-space:nowrap; }
     tr.chosen { background:#f5faec; }
-    .tag { display:inline-block; border-radius:4px; padding:4px 6px; background:#f2f2f2; color:#606060; font:10px Consolas,'Noto Sans Mono',monospace; }
-    .tag.video { background:#fce8ec; color:var(--red-dark); }
-    .progress-panel { position:sticky; bottom:0; z-index:3; flex:0 0 auto; padding:14px 18px; background:#fff; box-shadow:0 -8px 18px rgba(0,0,0,.05); }
+    .tag { display:inline-block; border-radius:4px; padding:4px 6px; background:#214447; color:#d9fffa; font:10px Consolas,'Noto Sans Mono',monospace; }
+    .tag.video { background:#124c4c; color:#a5ffea; }
+    .progress-panel { position:sticky; bottom:0; z-index:3; flex:0 0 auto; padding:14px 18px; background:#102326; box-shadow:0 -8px 18px rgba(0,0,0,.22); }
     .progress-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; }
     .progress-row strong { font-size:22px; letter-spacing:-.05em; }
-    .progress-track { height:8px; border-radius:99px; background:#e3e8df; overflow:hidden; }
+    .progress-track { height:8px; border-radius:99px; background:#1b3a3d; overflow:hidden; }
     .progress-bar { height:100%; border-radius:inherit; background:var(--red); transition:width .4s ease; }
     .stage { color:var(--muted); font-size:12px; margin:7px 0 0; }
-    .result { margin-top:12px; padding:12px 14px; border:1px solid #c9dfce; border-radius:8px; background:#f0f8f2; }
+    .speed { color:var(--muted); font:12px Consolas,'Noto Sans Mono',monospace; margin-top:4px; }
+    .result { margin-top:12px; padding:12px 14px; border:1px solid #387b70; border-radius:8px; background:#123b38; }
     .result-title { font-weight:700; margin-bottom:7px; }
     .path { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font:12px 'DM Mono',monospace; margin-bottom:14px; }
     .actions { display:flex; gap:8px; flex-wrap:wrap; }
-    .secondary { border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:4px; padding:9px 12px; font-size:12px; font-weight:600; }
-    .secondary:hover { border-color:var(--ink); background:#f7f7f7; }
+    .secondary { border:1px solid #46706f; background:#1b4143; color:#f5fffd; border-radius:4px; padding:9px 12px; font-size:12px; font-weight:600; transition:background .18s,border-color .18s; }
+    .secondary:hover { border-color:var(--red); background:#285b59; color:#ffffff; }
     .error { padding:12px 14px; margin-top:15px; border-radius:10px; color:#97422e; background:#fff0ea; font-size:13px; }
     @media (max-width:900px) { body { height:auto; min-height:100vh; overflow:auto; } .shell { width:min(100% - 24px, 650px); height:auto; min-height:100vh; padding-bottom:24px; } .topbar { flex:0 0 auto; grid-template-columns:1fr; gap:14px; padding:15px 0; } .top-search { order:3; } .status { position:absolute; right:20px; top:24px; } .hero { flex:0 0 auto; display:block; padding:18px 0 20px; } .hero p { margin-top:14px; } .workspace { flex:0 0 auto; grid-template-columns:1fr; align-items:start; } .control { position:static; } .content { min-height:500px; } .format-panel { min-height:500px; } .table-wrap { min-height:220px; } }
     @media (max-width:560px) { .picks { grid-template-columns:1fr; flex:0 0 auto; } .pick { min-height:78px; } h1 { font-size:34px; } }
@@ -83,17 +88,17 @@
 <body>
 <div id="app" class="shell">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark">▶</span><span>CLIPFORGE</span><span class="brand-sub">STUDIO</span></div>
-    <div class="top-search"><input v-model.trim="url" aria-label="视频地址" placeholder="搜索或粘贴视频链接" @keyup.enter="inspect"><button aria-label="读取视频" @click="inspect">⌕</button></div>
-    <div class="status"><span class="status-dot"></span>{{ serviceOnline ? 'SERVICE ONLINE' : 'CONNECTING' }}</div>
+    <div class="brand"><span class="brand-mark">▶</span><span>视频探测台</span><span class="brand-sub">下载工作室</span></div>
+    <div class="top-search"><input v-model.trim="url" aria-label="视频地址" placeholder="搜索或粘贴视频链接" @keyup.enter="inspect"><button class="paste-button" aria-label="粘贴视频链接" @click="pasteUrl">粘贴</button><button class="inspect-button" aria-label="读取视频" @click="inspect">⌕</button></div>
+    <div class="status"><span class="status-dot"></span>{{ serviceOnline ? '服务在线' : '正在连接' }}</div>
   </header>
   <section class="hero">
-    <div><div class="hero-kicker">yt-dlp / media workshop</div><h1>把视频，<br>锻造成文件。</h1></div>
-    <p>读取可用媒体流，精确选择最高码率的视频与音频，交给 ffmpeg 合并成 MP4。整个过程的状态都在这里。</p>
+    <div><div class="hero-kicker">媒体下载工作台</div><h1>把视频，<br>锻造成文件。</h1></div>
+    <p>读取可用媒体流，精确选择视频与音频轨道，交给 ffmpeg 合并成 MP4。下载进度、速度与状态一目了然。</p>
   </section>
   <main class="workspace">
     <aside class="panel control">
-      <div class="eyebrow">01 / settings</div>
+      <div class="eyebrow">01 / 下载设置</div>
       <div class="hint" style="margin-top:10px">视频地址请在顶部搜索框输入</div>
       <label for="cookies">登录凭据</label>
       <select id="cookies" v-model="cookieMode"><option value="FILE">cookies.txt 文件</option><option value="FIREFOX">Firefox 登录态</option><option value="NONE">匿名访问</option></select>
@@ -105,17 +110,25 @@
       <div v-if="!formats.length && !loading" class="panel empty"><div><div class="empty-icon">◌</div><h2>等待一段视频</h2><p>粘贴地址后，这里会出现它的画质与音频轨道。</p></div></div>
       <div v-if="loading" class="panel empty"><div><div class="empty-icon">◌</div><h2>正在探测媒体流</h2><p>yt-dlp 正在尝试多个 YouTube 客户端，请稍候。</p></div></div>
       <div v-if="formats.length" class="panel format-panel">
-        <div class="format-head"><h2>可用格式</h2><span class="pill">{{ formats.length }} TRACKS FOUND</span></div>
+        <div class="format-head"><h2>可用格式</h2><span class="pill">已找到 {{ formats.length }} 条轨道</span></div>
         <div class="picks">
-          <div class="pick active"><div class="pick-top"><span class="pick-title">最高码率视频</span><strong>▣</strong></div><select v-model="selectedVideo"><option v-for="item in videos" :key="item.id" :value="item.id">{{ item.id }} · {{ item.res }} · {{ item.tbr }}</option></select></div>
-          <div class="pick active"><div class="pick-top"><span class="pick-title">最高码率音频</span><strong>◖</strong></div><select v-model="selectedAudio"><option v-for="item in audios" :key="item.id" :value="item.id">{{ item.id }} · {{ item.tbr }} · {{ item.acodec }}</option></select></div>
+          <div class="pick active"><div class="pick-top"><span class="pick-title">视频轨道</span><strong>▣</strong></div><select v-model="selectedVideo"><option v-for="item in videos" :key="item.id" :value="item.id">{{ item.id }} · {{ item.res }} · {{ item.tbr }}</option></select></div>
+          <div class="pick active"><div class="pick-top"><span class="pick-title">音频轨道</span><strong>◖</strong></div><select v-model="selectedAudio"><option v-for="item in audios" :key="item.id" :value="item.id">{{ item.id }} · {{ item.tbr }} · {{ item.acodec }}</option></select></div>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>类型</th><th>ID</th><th>容器</th><th>分辨率</th><th>码率</th><th>编码</th><th>大小</th></tr></thead><tbody><tr v-for="item in formats" :key="item.id + item.ext" :class="{chosen: item.id === selectedVideo || item.id === selectedAudio}"><td><span class="tag" :class="{video: !item.audioOnly}">{{ item.audioOnly ? 'AUDIO' : 'VIDEO' }}</span></td><td>{{ item.id }}</td><td>{{ item.ext }}</td><td>{{ item.res }}</td><td>{{ item.audioOnly ? item.abr : item.tbr }}</td><td>{{ item.audioOnly ? item.acodec : item.vcodec }}</td><td>{{ item.size }}</td></tr></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>类型</th><th>编号</th><th>容器</th><th>分辨率</th><th>码率</th><th>编码</th><th>大小</th></tr></thead><tbody><tr v-for="item in formats" :key="item.id + item.ext" :class="{chosen: item.id === selectedVideo || item.id === selectedAudio}"><td><span class="tag" :class="{video: !item.audioOnly}">{{ item.audioOnly ? '音频' : '视频' }}</span></td><td>{{ item.id }}</td><td>{{ item.ext }}</td><td>{{ item.res }}</td><td>{{ item.audioOnly ? item.abr : item.tbr }}</td><td>{{ item.audioOnly ? item.acodec : item.vcodec }}</td><td>{{ item.size }}</td></tr></tbody></table></div>
       </div>
       <div v-if="formats.length" class="panel progress-panel">
-        <div class="progress-row"><div><div class="eyebrow">02 / forge mp4</div><div class="stage">{{ task ? task.stage : '选择轨道后开始下载' }}</div></div><strong>{{ Math.round(task ? task.progress : 0) }}%</strong></div>
+        <div class="progress-row"><div><div class="eyebrow">02 / 开始下载</div><div class="stage">{{ task ? task.stage : '选择轨道后开始下载' }}</div><div class="speed">速度：{{ task ? task.speed : '-' }}</div></div><strong>{{ Number(task ? task.progress : 0).toFixed(2) }}%</strong></div>
         <div class="progress-track"><div class="progress-bar" :style="{width: (task ? task.progress : 0) + '%'}"></div></div>
-        <button class="primary" :disabled="downloading || !selectedVideo || !selectedAudio" @click="download">{{ downloading ? '正在下载并合并…' : '下载并合并为 MP4  →' }}</button>
+        <label class="download-mode" for="download-mode">下载方式</label>
+        <select id="download-mode" v-model="downloadMode">
+          <option value="CUSTOM">视频 + 音频（合并为 MP4）</option>
+          <option value="VIDEO_ONLY">仅下载视频</option>
+          <option value="AUDIO_ONLY">仅下载音频</option>
+        </select>
+        <button class="primary" :disabled="downloading || !downloadReady" @click="download">{{ downloading ? '正在下载…' : downloadButtonText + '  →' }}</button>
+        <button v-if="task && task.status === 'RUNNING'" class="secondary" @click="pause">暂停</button>
+        <button v-if="task && task.status === 'PAUSED'" class="secondary" @click="resume">继续下载</button>
         <div v-if="result" class="result"><div class="result-title">下载完成，文件已经就位。</div><span class="path">{{ result.filePath }}</span><div class="actions"><button class="secondary" @click="openTarget(result.filePath)">⌗ 打开文件</button><button class="secondary" @click="openTarget(result.filePath, true)">□ 打开所在目录</button></div></div>
       </div>
     </section>
@@ -124,13 +137,31 @@
 <script>
 const { createApp } = Vue;
 createApp({
-  data: () => ({ url:'', cookieMode:'FILE', formats:[], selectedVideo:'', selectedAudio:'', loading:false, downloading:false, task:null, result:null, error:'', serviceOnline:false, pollTimer:null }),
+  data: () => ({ url:'', cookieMode:'FILE', formats:[], selectedVideo:'', selectedAudio:'', downloadMode:'CUSTOM', loading:false, downloading:false, task:null, result:null, error:'', serviceOnline:false, pollTimer:null }),
   computed: {
     videos() { return this.formats.filter(item => !item.audioOnly); },
-    audios() { return this.formats.filter(item => item.audioOnly); }
+    audios() { return this.formats.filter(item => item.audioOnly); },
+    downloadReady() {
+      return this.downloadMode === 'VIDEO_ONLY' ? !!this.selectedVideo
+        : this.downloadMode === 'AUDIO_ONLY' ? !!this.selectedAudio
+        : !!this.selectedVideo && !!this.selectedAudio;
+    },
+    downloadButtonText() {
+      return this.downloadMode === 'VIDEO_ONLY' ? '仅下载视频'
+        : this.downloadMode === 'AUDIO_ONLY' ? '仅下载音频'
+        : '下载并合并为 MP4';
+    }
   },
   async mounted() { try { const response = await fetch('/api/health'); this.serviceOnline = response.ok; } catch (_) {} },
   methods: {
+    async pasteUrl() {
+      try {
+        this.url = (await navigator.clipboard.readText()).trim();
+        this.error = '';
+      } catch (_) {
+        this.error = '无法读取剪贴板，请检查浏览器权限后重试';
+      }
+    },
     async inspect() {
       this.loading = true; this.error = ''; this.formats = []; this.task = null; this.result = null;
       try {
@@ -142,15 +173,29 @@ createApp({
     async download() {
       this.downloading = true; this.error = ''; this.result = null;
       try {
-        const response = await fetch('/api/download/async', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url:this.url, mode:'CUSTOM', cookieMode:this.cookieMode, formatId:`${this.selectedVideo}+${this.selectedAudio}`}) });
+        const formatId = this.downloadMode === 'VIDEO_ONLY' ? this.selectedVideo
+          : this.downloadMode === 'AUDIO_ONLY' ? this.selectedAudio
+          : `${this.selectedVideo}+${this.selectedAudio}`;
+        const response = await fetch('/api/download/async', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url:this.url, mode:this.downloadMode, cookieMode:this.cookieMode, formatId}) });
         if (!response.ok) throw new Error('无法创建下载任务'); this.task = await response.json(); this.poll();
       } catch (error) { this.error = error.message; this.downloading = false; }
+    },
+    async pause() {
+      if (!this.task) return;
+      try { await fetch(`/api/download/tasks/${this.task.taskId}/pause`, { method:'POST' }); this.poll(); }
+      catch (_) { this.error = '暂停下载失败'; }
+    },
+    async resume() {
+      if (!this.task) return;
+      try { const response = await fetch(`/api/download/tasks/${this.task.taskId}/resume`, { method:'POST' }); this.task = await response.json(); this.downloading = true; this.poll(); }
+      catch (_) { this.error = '继续下载失败'; }
     },
     poll() {
       clearTimeout(this.pollTimer); this.pollTimer = setTimeout(async () => {
         try { const response = await fetch(`/api/download/tasks/${this.task.taskId}`); this.task = await response.json();
           if (this.task.status === 'COMPLETED') { this.result = this.task.result; this.downloading = false; return; }
           if (this.task.status === 'FAILED') { this.error = this.task.message || '下载失败'; this.downloading = false; return; }
+          if (this.task.status === 'PAUSED') { this.downloading = false; return; }
           this.poll();
         } catch (error) { this.error = '读取下载进度失败'; this.downloading = false; }
       }, 700);

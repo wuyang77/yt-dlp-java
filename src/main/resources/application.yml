@@ -12,13 +12,21 @@ spring:
   application:
     name: yt-dlp-java
 
+# 统一使用 ISO-8601 时间、级别、线程、Logger 和事件字段，便于终端检索
+logging:
+  level:
+    root: INFO
+    "[org.wuyang.ytdlp]": INFO
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n"
+
 # =====================================================
 # yt-dlp-java 业务配置
 # =====================================================
 ytdlp:
   # 输出目录
   output:
-    dir: F:/学习资料/套图/打碟
+    dir: F:/HH学习资料/全套/1-福利/12-youtbue下载
     template: "%(title)s [%(resolution)s].%(ext)s"
 
   # yt-dlp 相关路径
@@ -41,8 +49,15 @@ ytdlp:
 
   # YouTube 客户端策略（按优先级排列）
   youtube:
-    clients: web_embedded,tv,tv_downgraded,mweb,android_vr
+    # web_creator 需要账号 Cookie；GVS PO Token 由 bgutil HTTP Provider 自动获取
+    clients: web_creator,web_embedded,tv,tv_downgraded,android_vr
+    # 并发探测客户端数量；建议 3-4，过高可能触发 YouTube 限流
+    parallelism: 4
 
   # 下载参数
   download:
     retries: 3
+    fragment-retries: 10
+    http-retries: 10
+    http-chunk-size: 10
+    force-ipv4: true

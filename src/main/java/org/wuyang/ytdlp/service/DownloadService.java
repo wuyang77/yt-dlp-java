@@ -1,6 +1,9 @@
 package org.wuyang.ytdlp.service;
 
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.wuyang.ytdlp.config.YtDlpProperties;
 import org.wuyang.ytdlp.model.*;
 
@@ -12,6 +15,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
@@ -30,14 +37,25 @@ import java.util.function.Consumer;
 @Service
 public class DownloadService {
 
+    private static final Logger log = LoggerFactory.getLogger(DownloadService.class);
+
     private final YtDlpRunner runner;
     private final PotProvider potProvider;
     private final YtDlpProperties props;
+    private final ExecutorService formatExecutor;
 
     public DownloadService(YtDlpRunner runner, PotProvider potProvider, YtDlpProperties props) {
         this.runner = runner;
         this.potProvider = potProvider;
         this.props = props;
+        int clientCount = props.youtube().clientArray().length;
+        int parallelism = props.youtube().parallelism() > 0 ? props.youtube().parallelism() : 4;
+        this.formatExecutor = Executors.newFixedThreadPool(Math.min(parallelism, Math.max(1, clientCount)));
+    }
+
+    @PreDestroy
+    public void shutdownFormatExecutor() {
+        formatExecutor.shutdownNow();
     }
 
     /**
@@ -48,13 +66,19 @@ public class DownloadService {
      * @return 格式列表响应
      */
     public FormatListResponse listFormats(String url, String cookieMode) {
+        log.info("event=formats.start url={} cookieMode={}", url, cookieMode);
         runner.resetState();
         runner.setCookieMode(parseCookieMode(cookieMode));
 
-        List<Format> formats = fetchFormats(url);
+        List<Format> formats = fetchFormats(url, parseCookieMode(cookieMode));
         if (formats.isEmpty()) {
+            log.warn("event=formats.empty url={} cookieMode={} lastClient={} potReady={}",
+                url, cookieMode, runner.lastClient(), potProvider.isReady());
             return FormatListResponse.fail("无可用格式: cookies / PO Token / 客户端问题");
         }
+        log.info("event=formats.success url={} count={} videoCount={} audioCount={}", url, formats.size(),
+            formats.stream().filter(format -> !format.audioOnly()).count(),
+            formats.stream().filter(format -> format.audioOnly()).count());
         return FormatListResponse.ok(formats);
     }
 
@@ -70,12 +94,22 @@ public class DownloadService {
 
     /** 执行下载，并将 yt-dlp 输出交给任务状态记录器 */
     public DownloadResponse download(DownloadRequest request, Consumer<String> outputListener) {
+        return download(request, outputListener, null);
+    }
+
+    /** Execute a download with task-level pause control. */
+    public DownloadResponse download(DownloadRequest request, Consumer<String> outputListener,
+                                     DownloadControl control) {
+        log.info("event=download.start url={} mode={} cookieMode={} formatId={}",
+            request.url(), request.mode(), request.cookieMode(), request.formatId());
         runner.resetState();
         runner.setCookieMode(parseCookieMode(request.cookieMode()));
 
         // 获取格式列表
-        List<Format> formats = fetchFormats(request.url());
+        List<Format> formats = fetchFormats(request.url(), parseCookieMode(request.cookieMode()));
         if (formats.isEmpty()) {
+            log.warn("event=download.formats_empty url={} mode={} lastClient={} potReady={}",
+                    request.url(), request.mode(), runner.lastClient(), potProvider.isReady());
             return DownloadResponse.fail("无可用格式: cookies / PO Token / 客户端问题");
         }
 
@@ -92,8 +126,10 @@ public class DownloadService {
         String formatExpr = buildFormatExpr(request, bestVideoId, bestAudioId);
 
         // 执行下载
-        String filePath = executeDownload(request.url(), formatExpr, outputListener);
+        String filePath = executeDownload(request.url(), formatExpr, request.mode(), outputListener, control);
         if (filePath == null) {
+            log.error("event=download.output_missing url={} mode={} format={}",
+                    request.url(), request.mode(), formatExpr);
             return DownloadResponse.fail("下载失败");
         }
 
@@ -105,6 +141,8 @@ public class DownloadService {
                 + " | " + audioFormats.get(0).acodec();
 
         String fileName = Path.of(filePath).getFileName().toString();
+        log.info("event=download.success url={} mode={} file={} format={}",
+            request.url(), request.mode(), fileName, formatExpr);
         return DownloadResponse.ok(filePath, fileName, bestVideo, bestAudio, diagnostics);
     }
 
@@ -115,12 +153,29 @@ public class DownloadService {
      *
      * <p>依次尝试多个 YouTube player_client，合并去重后排序。</p>
      */
-    private List<Format> fetchFormats(String url) {
+    private List<Format> fetchFormats(String url, YtDlpRunner.CookieMode requestCookieMode) {
+        long startedAt = System.nanoTime();
         Map<String, Format> dedup = new LinkedHashMap<>();
+        List<String> clients = List.of(props.youtube().clientArray()).stream()
+            .map(client -> client.trim()).filter(client -> !client.isBlank()).toList();
 
-        for (String client : props.youtube().clientArray()) {
-            for (Format f : tryList(url, client.trim())) {
-                dedup.putIfAbsent(f.id() + "|" + f.ext(), f);
+        ExecutorCompletionService<ClientFormats> completionService = new ExecutorCompletionService<>(formatExecutor);
+        for (String client : clients) {
+            completionService.submit(() -> tryList(url, client, requestCookieMode));
+        }
+        for (int completed = 0; completed < clients.size(); completed++) {
+            try {
+                ClientFormats result = completionService.take().get();
+                runner.updateDiagnostics(result.output(), result.client());
+                for (Format f : result.formats()) {
+                    dedup.putIfAbsent(f.id() + "|" + f.ext(), f);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("event=formats.interrupted url={} message={}", url, e.getMessage());
+                break;
+            } catch (ExecutionException e) {
+                log.warn("event=formats.worker_failed url={} message={}", url, e.getCause());
             }
         }
 
@@ -139,23 +194,30 @@ public class DownloadService {
                 return Double.compare(b.sizeValue(), a.sizeValue());
             }
         });
+        log.info("event=formats.probe_complete url={} clients={} formats={} elapsedMs={}",
+            url, clients.size(), list.size(), (System.nanoTime() - startedAt) / 1_000_000);
         return list;
     }
 
     /** 尝试用指定客户端获取格式列表 */
-    private List<Format> tryList(String url, String client) {
+    private ClientFormats tryList(String url, String client, YtDlpRunner.CookieMode requestCookieMode) {
         try {
+            runner.setCookieMode(requestCookieMode);
             List<String> cmd = runner.baseCmd();
             cmd.addAll(List.of(
                     "--extractor-args", "youtube:player_client=" + client,
                     "-F", url));
             String out = runner.run(cmd);
 
-            runner.updateDiagnostics(out, client);
-            return FormatParser.parse(out);
+            return new ClientFormats(client, out, FormatParser.parse(out));
         } catch (Exception e) {
-            return List.of();
+            log.warn("event=formats.client_failed url={} client={} message={}", url, client, e.getMessage());
+            log.debug("event=formats.client_failed_stack url={} client={}", url, client, e);
+            return new ClientFormats(client, "", List.of());
         }
+    }
+
+    private record ClientFormats(String client, String output, List<Format> formats) {
     }
 
     // ===================== 下载 =====================
@@ -166,34 +228,54 @@ public class DownloadService {
             case BEST_MERGE -> bestVideoId + "+" + bestAudioId
                     + "/" + bestVideoId + "+bestaudio"
                     + "/bestvideo+bestaudio";
-            case VIDEO_ONLY -> bestVideoId + "/bestvideo";
-            case AUDIO_ONLY -> bestAudioId + "/bestaudio";
+                case VIDEO_ONLY -> request.formatId() != null && !request.formatId().isBlank()
+                    ? request.formatId() : bestVideoId + "/bestvideo";
+                case AUDIO_ONLY -> request.formatId() != null && !request.formatId().isBlank()
+                    ? request.formatId() : bestAudioId + "/bestaudio";
             case CUSTOM -> request.formatId() != null && !request.formatId().isBlank()
                     ? request.formatId() : "bestvideo+bestaudio";
         };
     }
 
     /** 执行下载，返回输出文件路径 */
-    private String executeDownload(String url, String format, Consumer<String> outputListener) {
+    private String executeDownload(String url, String format, DownloadMode mode, Consumer<String> outputListener,
+                                   DownloadControl control) {
         try {
             Files.createDirectories(Path.of(props.output().dir()));
 
             List<String> cmd = runner.baseCmd();
-            cmd.addAll(List.of(
-                    "-f", format,
-                    "--merge-output-format", "mp4",
-                    "--remux-video", "mp4",
+                cmd.addAll(List.of("-f", format));
+                if (props.download().forceIpv4()) {
+                    cmd.add("--force-ipv4");
+                }
+                if (mode == DownloadMode.BEST_MERGE || mode == DownloadMode.CUSTOM || mode == DownloadMode.VIDEO_ONLY) {
+                cmd.addAll(List.of("--merge-output-format", "mp4", "--remux-video", "mp4"));
+                }
+                cmd.addAll(List.of(
                     "--windows-filenames",
                     "--add-metadata",
                     "--retries", String.valueOf(props.download().retries()),
+                    "--fragment-retries", String.valueOf(props.download().fragmentRetries()),
+                    "--retry-sleep", "fragment:exp=1:16",
+                    "--retry-sleep", "http:exp=1:16",
+                    "--file-access-retries", String.valueOf(props.download().httpRetries()),
+                    "--continue",
                     "--newline",
                     "--progress",
                     "--print", "after_move:filepath",
                     "-o", props.output().dir() + "/" + props.output().template(),
                     url));
-            String out = runner.run(cmd, outputListener);
+            if (props.download().httpChunkSize() > 0) {
+                cmd.add(cmd.size() - 1, "--http-chunk-size");
+                cmd.add(cmd.size() - 1, props.download().httpChunkSize() + "M");
+            }
+            String out = runner.run(cmd, outputListener, control);
             return extractFilePath(out);
+        } catch (YtDlpRunner.DownloadPausedException e) {
+            throw e;
         } catch (Exception e) {
+            log.error("event=download.execution_failed url={} mode={} format={} outputDir={} message={}",
+                    url, mode, format, props.output().dir(), e.getMessage(), e);
             return null;
         }
     }
@@ -215,11 +297,14 @@ public class DownloadService {
                         try {
                             return Files.getLastModifiedTime(p).toMillis();
                         } catch (IOException e) {
+                            log.warn("event=download.file_timestamp_failed file={} message={}", p, e.getMessage(), e);
                             return 0;
                         }
                     }))
                     .map(p -> p.toString()).orElse(null);
         } catch (IOException e) {
+            log.error("event=download.output_scan_failed outputDir={} message={}",
+                    props.output().dir(), e.getMessage(), e);
             return null;
         }
     }
