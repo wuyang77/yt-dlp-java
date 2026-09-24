@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * 下载服务
@@ -64,6 +65,11 @@ public class DownloadService {
      * @return 下载响应
      */
     public DownloadResponse download(DownloadRequest request) {
+        return download(request, null);
+    }
+
+    /** 执行下载，并将 yt-dlp 输出交给任务状态记录器 */
+    public DownloadResponse download(DownloadRequest request, Consumer<String> outputListener) {
         runner.resetState();
         runner.setCookieMode(parseCookieMode(request.cookieMode()));
 
@@ -86,7 +92,7 @@ public class DownloadService {
         String formatExpr = buildFormatExpr(request, bestVideoId, bestAudioId);
 
         // 执行下载
-        String filePath = executeDownload(request.url(), formatExpr);
+        String filePath = executeDownload(request.url(), formatExpr, outputListener);
         if (filePath == null) {
             return DownloadResponse.fail("下载失败");
         }
@@ -168,7 +174,7 @@ public class DownloadService {
     }
 
     /** 执行下载，返回输出文件路径 */
-    private String executeDownload(String url, String format) {
+    private String executeDownload(String url, String format, Consumer<String> outputListener) {
         try {
             Files.createDirectories(Path.of(props.output().dir()));
 
@@ -177,7 +183,7 @@ public class DownloadService {
                     "-f", format,
                     "--merge-output-format", "mp4",
                     "--remux-video", "mp4",
-                    "--restrict-filenames",
+                    "--windows-filenames",
                     "--add-metadata",
                     "--retries", String.valueOf(props.download().retries()),
                     "--newline",
@@ -185,7 +191,7 @@ public class DownloadService {
                     "--print", "after_move:filepath",
                     "-o", props.output().dir() + "/" + props.output().template(),
                     url));
-            String out = runner.run(cmd);
+            String out = runner.run(cmd, outputListener);
             return extractFilePath(out);
         } catch (Exception e) {
             return null;

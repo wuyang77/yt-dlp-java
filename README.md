@@ -137,7 +137,7 @@ ytdlp:
   # --- 输出目录 ---
   output:
     dir: F:/学习资料/套图/打碟          # 下载文件保存目录
-    template: "%(title).80B [%(height)sp].%(ext)s"  # 文件名模板
+    template: "%(title)s [%(resolution)s].%(ext)s"  # 完整标题 + 分辨率，保留 Unicode
 
   # --- 二进制依赖路径 ---
   bin:
@@ -171,7 +171,7 @@ ytdlp:
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `ytdlp.output.dir` | String | `F:/学习资料/套图/打碟` | 下载文件保存目录，需有写入权限 |
-| `ytdlp.output.template` | String | `%(title).80B [%(height)sp].%(ext)s` | yt-dlp 文件名模板 |
+| `ytdlp.output.template` | String | `%(title)s [%(resolution)s].%(ext)s` | 完整标题 + 分辨率的文件名模板 |
 | `ytdlp.bin.yt-dlp` | String | `src/main/resources/yt-dlp.exe` | yt-dlp 二进制路径 |
 | `ytdlp.bin.ffmpeg` | String | `src/main/resources/ffmpeg.exe` | ffmpeg 二进制路径 |
 | `ytdlp.bin.cookies` | String | `src/main/resources/cookies.txt` | cookies 文件路径 |

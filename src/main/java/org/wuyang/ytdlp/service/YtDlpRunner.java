@@ -4,11 +4,13 @@ import org.springframework.stereotype.Component;
 import org.wuyang.ytdlp.config.YtDlpProperties;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * yt-dlp 命令构建器和执行器
@@ -93,6 +95,8 @@ public class YtDlpRunner {
         cmd.add("--user-agent"); cmd.add(userAgent);
         cmd.add("--referer"); cmd.add(referer);
         cmd.add("--js-runtimes"); cmd.add("node:" + nodePath);
+        cmd.add("--socket-timeout"); cmd.add("30");
+        cmd.add("--extractor-retries"); cmd.add("3");
 
         if (potProvider != null && potProvider.isReady()) {
             cmd.add("--extractor-args");
@@ -119,6 +123,11 @@ public class YtDlpRunner {
 
     /** 执行命令，实时显示进度，返回完整输出文本 */
     public String run(List<String> cmd) throws Exception {
+        return run(cmd, null);
+    }
+
+    /** 执行命令，并将每一行输出交给调用方用于进度展示 */
+    public String run(List<String> cmd, Consumer<String> outputListener) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(cmd).redirectErrorStream(true);
         // 清除 IDE 注入的 NODE_OPTIONS，避免 node shim 拦截 yt-dlp 的 JS 挑战求解
         pb.environment().remove("NODE_OPTIONS");
@@ -127,6 +136,7 @@ public class YtDlpRunner {
         try (BufferedReader r = p.inputReader(StandardCharsets.UTF_8)) {
             String line;
             while ((line = r.readLine()) != null) {
+                if (outputListener != null) outputListener.accept(line);
                 if (line.contains("[download]") && line.contains("%")) {
                     System.out.print("\r" + line + "    ");
                     continue;
@@ -139,7 +149,10 @@ public class YtDlpRunner {
                 sb.append(line).append('\n');
             }
         }
-        p.waitFor();
+        int exitCode = p.waitFor();
+        if (exitCode != 0) {
+            throw new IOException("yt-dlp 退出失败，退出码: " + exitCode);
+        }
         return sb.toString();
     }
 

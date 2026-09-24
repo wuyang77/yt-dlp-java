@@ -1,10 +1,19 @@
 package org.wuyang.ytdlp.controller;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.wuyang.ytdlp.model.DownloadRequest;
 import org.wuyang.ytdlp.model.DownloadResponse;
+import org.wuyang.ytdlp.model.DownloadTask;
 import org.wuyang.ytdlp.model.FormatListResponse;
+import org.wuyang.ytdlp.config.YtDlpProperties;
 import org.wuyang.ytdlp.service.DownloadService;
+import org.wuyang.ytdlp.service.DownloadTaskService;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * 下载 REST 控制器
@@ -23,9 +32,14 @@ import org.wuyang.ytdlp.service.DownloadService;
 public class DownloadController {
 
     private final DownloadService downloadService;
+    private final DownloadTaskService taskService;
+    private final YtDlpProperties properties;
 
-    public DownloadController(DownloadService downloadService) {
+    public DownloadController(DownloadService downloadService, DownloadTaskService taskService,
+                              YtDlpProperties properties) {
         this.downloadService = downloadService;
+        this.taskService = taskService;
+        this.properties = properties;
     }
 
     /**
@@ -66,6 +80,50 @@ public class DownloadController {
                     request.cookieMode(), request.formatId());
         }
         return downloadService.download(request);
+    }
+
+    /** 创建异步下载任务，供 Web 前端显示实时进度 */
+    @PostMapping("/download/async")
+    public DownloadTask startDownload(@RequestBody DownloadRequest request) {
+        if (request.url() == null || request.url().isBlank()) {
+            throw new IllegalArgumentException("URL 不能为空");
+        }
+        if (request.mode() == null) {
+            request = new DownloadRequest(request.url(), org.wuyang.ytdlp.model.DownloadMode.BEST_MERGE,
+                    request.cookieMode(), request.formatId());
+        }
+        return taskService.start(request);
+    }
+
+    /** 查询异步下载任务 */
+    @GetMapping("/download/tasks/{taskId}")
+    public DownloadTask task(@PathVariable String taskId) {
+        DownloadTask task = taskService.find(taskId);
+        if (task == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在");
+        return task;
+    }
+
+    /** 在运行服务的 Windows 计算机上打开文件或其所在目录 */
+    @PostMapping("/files/open")
+    public Map<String, Object> openFile(@RequestParam String path) {
+        try {
+            Path outputDir = Path.of(properties.output().dir()).toAbsolutePath().normalize();
+            Path target = Path.of(path).toAbsolutePath().normalize();
+            if (!target.startsWith(outputDir) || !Files.exists(target)) {
+                return Map.of("success", false, "message", "文件不在下载目录内或不存在");
+            }
+            if (!System.getProperty("os.name").toLowerCase().contains("win")) {
+                return Map.of("success", false, "message", "打开文件功能目前仅支持 Windows");
+            }
+            if (Files.isDirectory(target)) {
+                new ProcessBuilder("explorer.exe", target.toString()).start();
+            } else {
+                new ProcessBuilder("explorer.exe", "/select,", target.toString()).start();
+            }
+            return Map.of("success", true, "message", "已打开");
+        } catch (Exception e) {
+            return Map.of("success", false, "message", "无法打开: " + e.getMessage());
+        }
     }
 
     /** 健康检查端点 */

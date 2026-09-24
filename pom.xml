@@ -26,6 +26,12 @@
     </properties>
 
     <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- Spring Boot Web：提供 REST API 和内嵌 Tomcat -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
