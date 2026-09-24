@@ -81,7 +81,7 @@ public class DownloadService {
 
         // 自动选取最高码率的视频和音频
         List<Format> videoFormats = formats.stream().filter(f -> !f.audioOnly()).toList();
-        List<Format> audioFormats = formats.stream().filter(Format::audioOnly).toList();
+        List<Format> audioFormats = formats.stream().filter(format -> format.audioOnly()).toList();
         String bestVideoId = videoFormats.isEmpty() ? "bestvideo" : videoFormats.get(0).id();
         String bestAudioId = audioFormats.isEmpty() ? "bestaudio" : audioFormats.get(0).id();
 
@@ -218,7 +218,7 @@ public class DownloadService {
                             return 0;
                         }
                     }))
-                    .map(Path::toString).orElse(null);
+                    .map(p -> p.toString()).orElse(null);
         } catch (IOException e) {
             return null;
         }

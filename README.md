@@ -19,7 +19,7 @@
 
 ## 1. 项目概述
 
-本项目是一个基于 **Spring Boot 3.0.0** 构建的 YouTube 视频下载服务。它通过封装 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 命令行工具，提供 RESTful API 接口，支持以下核心功能：
+本项目是一个基于 **Spring Boot 3.5.16** 构建的 YouTube 视频下载服务。它通过封装 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 命令行工具，提供 RESTful API 接口，支持以下核心功能：
 
 - 自动遍历多个 YouTube 客户端（`web_embedded`、`tv`、`mweb` 等）获取完整格式列表
 - 集成 [bgutil-ytdlp-pot-provider](https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs) 解决 PO Token 限制，获取高清格式
@@ -79,7 +79,7 @@ Maven Toolchains 插件要求在 `~/.m2/toolchains.xml` 中配置 JDK 路径：
 
 ```
 yt-dlp-java/
-├── pom.xml                                  # Maven 构建文件 (Spring Boot 3.0.0)
+├── pom.xml                                  # Maven 构建文件 (Spring Boot 3.5.16)
 ├── .gitignore                               # Git 忽略规则
 ├── README.md                                # 本文件
 ├── src/

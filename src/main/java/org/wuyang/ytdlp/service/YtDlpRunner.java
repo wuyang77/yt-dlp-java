@@ -95,6 +95,9 @@ public class YtDlpRunner {
         cmd.add("--user-agent"); cmd.add(userAgent);
         cmd.add("--referer"); cmd.add(referer);
         cmd.add("--js-runtimes"); cmd.add("node:" + nodePath);
+        // yt-dlp 新版需要 EJS Challenge 求解脚本；仅配置 Node.js 运行时还不够。
+        // 脚本从官方 GitHub 组件源获取，不会绕过登录或年龄验证。
+        cmd.add("--remote-components"); cmd.add("ejs:github");
         cmd.add("--socket-timeout"); cmd.add("30");
         cmd.add("--extractor-retries"); cmd.add("3");
 
