@@ -15,10 +15,6 @@ spring:
     ansi:
       enabled: ALWAYS
 
-# 启动完成后自动打开前端页面；若不需要可改为 false
-app:
-  open-browser: true
-
 # 使用 ANSI 颜色区分日志级别，同时保留 ISO-8601 时间和可检索字段
 logging:
   level:

@@ -12,6 +12,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
 /**
@@ -213,6 +218,124 @@ public class YtDlpRunner {
         return sb.toString();
     }
 
+    /** Resolve a browser-playable progressive stream URL without logging its signed URL. */
+    public String resolvePreviewUrl(String url, String requestedCookieMode) throws IOException, InterruptedException {
+        return resolvePreviewUrls(url, requestedCookieMode, null, null).get(0);
+    }
+
+    /** Resolve selected video/audio formats without logging their signed URLs. */
+    public List<String> resolvePreviewUrls(String url, String requestedCookieMode,
+                                           String videoFormatId, String audioFormatId)
+            throws IOException, InterruptedException {
+        resetState();
+        setCookieMode(parseCookieMode(requestedCookieMode));
+
+        String videoFormat = isFormatId(videoFormatId) ? videoFormatId : null;
+        String audioFormat = isFormatId(audioFormatId) ? audioFormatId : null;
+        if (videoFormatId != null && videoFormat == null) {
+            throw new IOException("无效的视频格式编号");
+        }
+        if (audioFormatId != null && audioFormat == null) {
+            throw new IOException("无效的音频格式编号");
+        }
+        String formatSelector = videoFormat == null
+                ? "best[ext=mp4][protocol=https]/best[protocol=https]/best"
+                : videoFormat + (audioFormat == null ? "" : "+" + audioFormat);
+
+        List<String> cmd = baseCmd();
+        cmd.addAll(List.of(
+                "--no-warnings",
+                "--no-playlist",
+                "-f", formatSelector,
+                "-g",
+                url));
+
+        List<String> lines = capturePreviewOutput(cmd, "解析预览视频地址");
+        List<String> urls = new ArrayList<>();
+        for (String line : lines) {
+            String candidate = line.trim();
+            if (candidate.startsWith("https://")) {
+                urls.add(candidate);
+            }
+        }
+        if (urls.isEmpty()) {
+            throw new IOException("yt-dlp 未返回可播放的视频地址");
+        }
+        return urls;
+    }
+
+    /** Retrieve format and caption metadata without logging signed URLs. */
+    public String getPreviewInfoJson(String url, String requestedCookieMode) throws IOException, InterruptedException {
+        resetState();
+        setCookieMode(parseCookieMode(requestedCookieMode));
+        List<String> cmd = baseCmd();
+        cmd.addAll(List.of("--no-warnings", "--no-playlist", "--skip-download", "--dump-single-json", url));
+        return String.join("\n", capturePreviewOutput(cmd, "读取预览选项"));
+    }
+
+    /** Download selected source subtitles into a caller-owned temporary directory. */
+    public void downloadPreviewSubtitles(String url, String requestedCookieMode, String languages, Path outputTemplate)
+            throws IOException, InterruptedException {
+        if (languages == null || !languages.matches("[A-Za-z0-9._-]{1,35}(,[A-Za-z0-9._-]{1,35})?")) {
+            throw new IOException("无效的字幕语言");
+        }
+        resetState();
+        setCookieMode(parseCookieMode(requestedCookieMode));
+        List<String> cmd = baseCmd();
+        cmd.addAll(List.of(
+                "--no-warnings", "--no-playlist", "--skip-download",
+                "--write-subs", "--write-auto-subs", "--sub-langs", languages,
+                "--sub-format", "vtt/best", "--convert-subs", "vtt",
+                "-o", outputTemplate.toString(), url));
+        capturePreviewOutput(cmd, "读取字幕");
+    }
+
+    private List<String> capturePreviewOutput(List<String> cmd, String operation) throws IOException, InterruptedException {
+        ProcessBuilder builder = new ProcessBuilder(cmd).redirectErrorStream(true);
+        builder.environment().remove("NODE_OPTIONS");
+        Process process = builder.start();
+        CompletableFuture<List<String>> output = CompletableFuture.supplyAsync(() -> {
+            try (BufferedReader reader = process.inputReader(StandardCharsets.UTF_8)) {
+                return reader.lines().toList();
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        });
+
+        try {
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IOException(operation + "超时，请稍后重试");
+            }
+            List<String> lines;
+            try {
+                lines = output.get(5, TimeUnit.SECONDS);
+            } catch (ExecutionException | TimeoutException e) {
+                throw new IOException(operation + "失败", e);
+            }
+            if (process.exitValue() != 0) {
+                log.warn("event=preview.command_failed operation={} exitCode={}", operation, process.exitValue());
+                throw new IOException("无法" + operation + "，请检查视频是否可访问及登录凭据是否有效");
+            }
+            return lines;
+        } catch (InterruptedException e) {
+            process.destroyForcibly();
+            Thread.currentThread().interrupt();
+            throw e;
+        } finally {
+            if (process.isAlive()) {
+                process.destroyForcibly();
+            }
+            if (!output.isDone()) {
+                output.cancel(true);
+            }
+        }
+    }
+
+    private static boolean isFormatId(String value) {
+        return value != null && value.matches("[A-Za-z0-9._-]{1,64}");
+    }
+
     public static final class DownloadPausedException extends RuntimeException {
         public DownloadPausedException() {
             super("下载已暂停");
@@ -297,6 +420,17 @@ public class YtDlpRunner {
         }
         if (proxy != null && !proxy.isBlank()) {
             cmd.add("--proxy"); cmd.add(proxy.trim());
+        }
+    }
+
+    private static CookieMode parseCookieMode(String mode) {
+        if (mode == null || mode.isBlank()) {
+            return CookieMode.FILE;
+        }
+        try {
+            return CookieMode.valueOf(mode.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return CookieMode.FILE;
         }
     }
 }

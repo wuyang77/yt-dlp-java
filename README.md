@@ -284,9 +284,22 @@ PO Token Provider 将在应用启动时自动初始化（下载二进制 → 启
 |------|------|------|
 | `GET` | `/api/health` | 健康检查 |
 | `GET` | `/api/formats` | 获取视频可用格式列表 |
+| `GET` | `/api/preview/options` | 查询 yt-dlp 预览格式与字幕选项 |
+| `GET` | `/api/preview` | 解析 yt-dlp 预览媒体流 |
+| `GET` | `/api/preview/subtitles` | 获取源字幕并转换为 WebVTT |
 | `POST` | `/api/download` | 执行下载 |
 
-### 7.2 获取格式列表
+### 7.2 视频预览
+
+前端顶部的“预览”按钮会打开 YouTube 官方嵌入式播放器。播放、清晰度、字幕/自动翻译和音轨/配音选择均由 YouTube 原生播放器提供，用户可像在 YouTube 一样使用底部控制栏和齿轮菜单；项目只提供播放器外部的关闭按钮，以返回下载页。
+
+```
+https://www.youtube.com/embed/{videoId}?controls=1&hl=zh-CN
+```
+
+预览支持标准 YouTube、短链接、Shorts、直播及嵌入链接。是否可播放、是否允许嵌入，以及视频本身提供哪些清晰度、字幕翻译和配音选项，仍由 YouTube 和视频发布者决定。
+
+### 7.3 获取格式列表
 
 ```
 GET /api/formats?url={url}&cookieMode={cookieMode}
@@ -340,7 +353,7 @@ curl "http://localhost:8080/api/formats?url=https://www.youtube.com/watch?v=dQw4
 }
 ```
 
-### 7.3 执行下载
+### 7.4 执行下载
 
 ```
 POST /api/download

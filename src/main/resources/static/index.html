@@ -20,6 +20,7 @@
     .top-search input { border-radius:20px 0 0 20px; padding:9px 16px; background:#1c1c24; color:var(--ink); }
     .top-search button { border:1px solid var(--line); border-left:0; background:#24242d; color:var(--ink); }
     .top-search .paste-button { width:64px; }
+    .top-search .preview-button { width:76px; border:1px solid var(--line); border-left:0; background:#24242d; color:var(--red); }
     .top-search .inspect-button { width:52px; border-radius:0 20px 20px 0; }
     .status { justify-self:end; display:flex; align-items:center; gap:8px; color:var(--muted); font:11px Consolas,'Noto Sans Mono',monospace; }
     .status-dot { width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 12px var(--red); }
@@ -83,15 +84,20 @@
     .secondary { border:1px solid #3b3b46; background:#24242d; color:var(--ink); border-radius:4px; padding:9px 12px; font-size:12px; font-weight:600; transition:background .18s,border-color .18s; }
     .secondary:hover { border-color:var(--red); background:#2c2c36; color:var(--red); }
     .error { padding:12px 14px; margin-top:15px; border:1px solid rgba(254,44,85,.5); border-radius:10px; color:#ff879d; background:rgba(254,44,85,.12); font-size:13px; }
+    .preview-overlay { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:48px 24px 24px; background:rgba(0,0,0,.94); }
+    .preview-dialog { position:relative; width:min(1280px,100%); overflow:visible; background:#000; }
+    .preview-close { position:absolute; right:0; top:-42px; width:36px; height:36px; border-radius:50%; background:#282828; color:#fff; font-size:24px; line-height:1; }
+    .preview-close:hover { background:#454545; }
+    .preview-frame { display:block; width:100%; aspect-ratio:16/9; border:0; background:#000; }
     @media (max-width:900px) { body { height:auto; min-height:100vh; overflow:auto; } .shell { width:min(100% - 24px, 650px); height:auto; min-height:100vh; padding-bottom:24px; } .topbar { flex:0 0 auto; grid-template-columns:1fr; gap:14px; padding:15px 0; } .top-search { order:3; } .status { position:absolute; right:20px; top:24px; } .hero { flex:0 0 auto; display:block; padding:18px 0 20px; } .hero p { margin-top:14px; } .workspace { flex:0 0 auto; grid-template-columns:1fr; align-items:start; } .control { position:static; } .content { min-height:500px; } .format-panel { min-height:500px; } .table-wrap { min-height:220px; } }
-    @media (max-width:560px) { .picks { grid-template-columns:1fr; flex:0 0 auto; } .pick { min-height:78px; } h1 { font-size:34px; } }
+    @media (max-width:560px) { .picks { grid-template-columns:1fr; flex:0 0 auto; } .pick { min-height:78px; } h1 { font-size:34px; } .preview-overlay { padding:44px 8px 8px; } .preview-dialog { width:100%; } }
   </style>
 </head>
 <body>
 <div id="app" class="shell">
   <header class="topbar">
     <div class="brand"><span class="brand-mark">▶</span><span>视频探测台</span><span class="brand-sub">下载工作室</span></div>
-    <div class="top-search"><input v-model.trim="url" aria-label="视频地址" placeholder="搜索或粘贴视频链接" @keyup.enter="inspect"><button class="paste-button" aria-label="粘贴视频链接" @click="pasteUrl">粘贴</button><button class="inspect-button" aria-label="读取视频" @click="inspect">⌕</button></div>
+    <div class="top-search"><input v-model.trim="url" aria-label="视频地址" placeholder="搜索或粘贴视频链接" @keyup.enter="inspect"><button class="paste-button" aria-label="粘贴视频链接" @click="pasteUrl">粘贴</button><button class="preview-button" :disabled="!url" aria-label="预览视频" @click="openPreview">预览</button><button class="inspect-button" aria-label="读取视频" @click="inspect">⌕</button></div>
     <div class="status"><span class="status-dot"></span>{{ serviceOnline ? '服务在线' : '正在连接' }}</div>
   </header>
   <section class="hero">
@@ -135,14 +141,23 @@
       </div>
     </section>
   </main>
+  <div v-if="previewOpen" class="preview-overlay" role="dialog" aria-modal="true" aria-label="视频预览" @click.self="closePreview">
+    <section class="preview-dialog">
+      <button class="secondary preview-close" aria-label="关闭预览" title="关闭预览" @click="closePreview">×</button>
+      <iframe v-if="previewVideoId" class="preview-frame" :src="previewEmbedUrl" title="YouTube 视频播放器"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    </section>
+  </div>
 </div>
 <script>
 const { createApp } = Vue;
 createApp({
-  data: () => ({ url:'', cookieMode:'FILE', formats:[], selectedVideo:'', selectedAudio:'', downloadMode:'CUSTOM', loading:false, downloading:false, task:null, result:null, error:'', serviceOnline:false, pollTimer:null }),
+  data: () => ({ url:'', cookieMode:'FILE', formats:[], selectedVideo:'', selectedAudio:'', downloadMode:'CUSTOM', loading:false, downloading:false, task:null, result:null, error:'', serviceOnline:false, pollTimer:null, previewOpen:false, previewVideoId:'' }),
   computed: {
     videos() { return this.formats.filter(item => !item.audioOnly); },
     audios() { return this.formats.filter(item => item.audioOnly); },
+    previewEmbedUrl() { return this.previewVideoId ? `https://www.youtube.com/embed/${this.previewVideoId}?autoplay=1&controls=1&playsinline=1&hl=zh-CN&cc_lang_pref=zh-Hans` : ''; },
     downloadReady() {
       return this.downloadMode === 'VIDEO_ONLY' ? !!this.selectedVideo
         : this.downloadMode === 'AUDIO_ONLY' ? !!this.selectedAudio
@@ -162,6 +177,35 @@ createApp({
         this.error = '';
       } catch (_) {
         this.error = '无法读取剪贴板，请检查浏览器权限后重试';
+      }
+    },
+    async openPreview() {
+      if (!this.url.trim()) return;
+      const videoId = this.extractYouTubeVideoId(this.url);
+      if (!videoId) {
+        this.error = '无法识别该 YouTube 视频链接';
+        return;
+      }
+      this.error = '';
+      this.previewOpen = true;
+      this.previewVideoId = videoId;
+    },
+    closePreview() {
+      this.previewOpen = false;
+      this.previewVideoId = '';
+    },
+    extractYouTubeVideoId(value) {
+      try {
+        const parsed = new URL(value);
+        const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+        let id = '';
+        if (host === 'youtu.be') id = parsed.pathname.split('/').filter(Boolean)[0] || '';
+        else if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+          id = parsed.searchParams.get('v') || parsed.pathname.match(/^\/(?:embed|shorts|live|v)\/([^/?]+)/)?.[1] || '';
+        }
+        return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
+      } catch (_) {
+        return '';
       }
     },
     async inspect() {
