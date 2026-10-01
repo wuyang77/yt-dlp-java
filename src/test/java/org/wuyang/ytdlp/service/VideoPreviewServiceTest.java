@@ -1,7 +1,7 @@
 package org.wuyang.ytdlp.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,7 +31,7 @@ class VideoPreviewServiceTest {
                   "automatic_captions":{"zh-Hans":[{"name":"简体中文","ext":"vtt"}]}
                 }
                 """);
-        VideoPreviewService service = new VideoPreviewService(runner, new ObjectMapper());
+        VideoPreviewService service = new VideoPreviewService(runner, JsonMapper.builder().build());
 
         var response = service.getOptions("https://youtu.be/abcdefghijk", "FILE");
 
@@ -55,7 +55,7 @@ class VideoPreviewServiceTest {
             return null;
         }).when(runner).downloadPreviewSubtitles(eq("https://youtu.be/abcdefghijk"), eq("FILE"),
                 eq("en,zh-Hans"), any(Path.class));
-        VideoPreviewService service = new VideoPreviewService(runner, new ObjectMapper());
+        VideoPreviewService service = new VideoPreviewService(runner, JsonMapper.builder().build());
 
         String subtitles = service.getSubtitles("https://youtu.be/abcdefghijk", "FILE", "en,zh-Hans");
 

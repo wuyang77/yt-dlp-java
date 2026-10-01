@@ -10,16 +10,17 @@
 - [4. 配置说明](#4-配置说明)
 - [5. 安装与构建](#5-安装与构建)
 - [6. 启动服务](#6-启动服务)
-- [7. API 使用指南](#7-api-使用指南)
-- [8. 下载示例](#8-下载示例)
-- [9. 架构设计](#9-架构设计)
-- [10. 常见问题](#10-常见问题)
+- [7. 发布上线](#7-发布上线)
+- [8. API 使用指南](#8-api-使用指南)
+- [9. 下载示例](#9-下载示例)
+- [10. 架构设计](#10-架构设计)
+- [11. 常见问题](#11-常见问题)
 
 ---
 
 ## 1. 项目概述
 
-本项目是一个基于 **Spring Boot 3.5.16** 构建的 YouTube 视频下载服务。它通过封装 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 命令行工具，提供 RESTful API 接口，支持以下核心功能：
+本项目是一个基于 **Spring Boot 4.1.1** 构建的 YouTube 视频下载服务。它通过封装 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 命令行工具，提供 RESTful API 接口，支持以下核心功能：
 
 - 自动遍历多个 YouTube 客户端（`web_embedded`、`tv`、`tv_downgraded`、`android_vr`）获取可用格式列表
 - 集成 [bgutil-ytdlp-pot-provider](https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs) 解决 PO Token 限制，获取高清格式
@@ -79,7 +80,7 @@ Maven Toolchains 插件要求在 `~/.m2/toolchains.xml` 中配置 JDK 路径：
 
 ```
 yt-dlp-java/
-├── pom.xml                                  # Maven 构建文件 (Spring Boot 3.5.16)
+├── pom.xml                                  # Maven 构建文件 (Spring Boot 4.1.1)
 ├── .gitignore                               # Git 忽略规则
 ├── README.md                                # 本文件
 ├── src/
@@ -276,7 +277,42 @@ PO Token Provider 将在应用启动时自动初始化（下载二进制 → 启
 
 ---
 
-## 7. API 使用指南
+## 7. 发布上线
+
+项目提供 Windows PowerShell 发布脚本 `deploy.ps1`。脚本会先执行 `mvn clean verify`，再将可执行 JAR、yt-dlp/ffmpeg 运行文件和 yt-dlp 插件复制到部署目录，启动 Spring Boot，并等待 `/api/health` 返回 `OK`。Maven 打包会排除本机运行二进制、插件目录和 `cookies.txt`；发布脚本也不会复制登录凭据，避免将其打包或覆盖。以下命令仅对本次 PowerShell 进程临时绕过执行策略，不会修改系统级策略。
+
+**发布机要求：** Windows、JDK 17+、Maven 3.8+、Node.js 18+；项目运行所需的 `yt-dlp.exe`、`ffmpeg.exe`、`ffprobe.exe` 和 `src/main/resources/yt-dlp-plugins/` 必须已准备好。
+
+```powershell
+# 首次发布（默认目录：%LOCALAPPDATA%\yt-dlp-java；默认只监听本机 127.0.0.1:8080）
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1
+
+# 指定发布目录、端口、Node.js 和下载保存目录
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 `
+  -InstallDir "D:\apps\yt-dlp-java" -Port 8080 `
+  -NodePath "D:\tools\node.exe" -OutputDir "D:\media\downloads"
+
+# 常用服务操作
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 -Action Status
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 -Action Stop
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 -Action Start
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 -Action Restart
+
+# 如使用可信反向代理并已配置 HTTPS 与访问控制，可改为监听所有网卡
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 -BindAddress "0.0.0.0"
+```
+
+`-Action Deploy`（默认）会重新构建、发布并启动；`Start`/`Stop`/`Restart`/`Status` 用于管理已发布的实例。管理已有实例时，应继续使用发布时相同的 `-InstallDir` 和 `-Port`。可用 `-MaxHeap "2g"` 调整 JVM 最大内存（默认 `1g`）。
+
+部署目录内的 `cookies.txt` 可由管理员手动放入；脚本默认引用该文件但不会从源码目录复制它。日志位于部署目录 `logs/`，下载文件位于 `downloads/`（或 `-OutputDir` 指定的位置）。停止/重启会结束该服务进程，正在进行的下载可能中断；更新前请先确认没有重要任务。
+
+此脚本用于 Windows 主机上的发布与后台启动，不会注册 Windows 服务或设置开机自动启动；主机重启后可再次运行 `-Action Start`。项目目前包含 Windows 运行二进制，Linux 部署需要准备与服务器平台匹配的 yt-dlp/ffmpeg/PO Token Provider 并调整应用配置。
+
+**公网安全：** 服务默认只绑定本机。应用没有内置用户认证，不要直接暴露在公网；需要远程访问时，应放在配置了 HTTPS、认证和访问控制的反向代理后，并自行配置服务器防火墙。YouTube 访问、Cookies 与平台对视频的限制仍适用。
+
+---
+
+## 8. API 使用指南
 
 ### 7.1 API 端点总览
 
@@ -380,7 +416,7 @@ Content-Type: application/json
 
 ---
 
-## 8. 下载示例
+## 9. 下载示例
 
 ### 8.1 最高码率合并下载（推荐）
 
@@ -466,7 +502,7 @@ curl -X POST http://localhost:8080/api/download \
 
 ---
 
-## 9. 架构设计
+## 10. 架构设计
 
 ### 9.1 分层架构
 
@@ -524,7 +560,7 @@ curl -X POST http://localhost:8080/api/download \
 
 ---
 
-## 10. 常见问题
+## 11. 常见问题
 
 ### 10.1 启动时报 "找不到 config.properties"
 

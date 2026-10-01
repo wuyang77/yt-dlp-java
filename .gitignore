@@ -23,6 +23,7 @@ src/main/resources/*.dll
 *.log
 *.cfg
 downloads/
+/release/
 
 # --- YouTube 登录凭证（禁止提交） ---
 src/main/resources/cookies.txt
