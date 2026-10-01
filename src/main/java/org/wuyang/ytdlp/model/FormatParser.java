@@ -23,22 +23,26 @@ public final class FormatParser {
      * @return 解析出的格式列表（可能为空）
      */
     public static List<Format> parse(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+
         List<Format> list = new ArrayList<>();
         for (String raw : text.split("\\R")) {
             String line = raw.trim();
-            if (!line.contains("|")) continue;
+            if (line.isEmpty() || !line.contains("|")) continue;
             if (line.toLowerCase().contains("storyboard")) continue;
             if (line.toLowerCase().matches("id .*|.*resolution fps.*")) continue;
 
-            String[] blocks = line.split("\\|");
+            String[] blocks = line.split("\\|", 3);
             if (blocks.length < 3) continue;
 
             String[] header = blocks[0].trim().split("\\s+");
             if (header.length < 3 || header[0].equalsIgnoreCase("ID")) continue;
 
             String id = header[0];
-            String ext = header[1];
-            String res = header[2];
+            String ext = header.length > 1 ? header[1] : "";
+            String res = header.length > 2 ? header[2] : "";
             String fps = header.length > 3 ? header[3].replaceAll("[^0-9.]", "") : "";
 
             String[] meta = blocks[1].trim().split("\\s+");
@@ -47,8 +51,8 @@ public final class FormatParser {
 
             String part3 = blocks[2].trim();
             String[] parts = part3.split("\\s+");
-            boolean audioOnly = res.toLowerCase().contains("audio only")
-                    || part3.toLowerCase().startsWith("audio only");
+            String fullText = (res + " " + part3).toLowerCase();
+            boolean audioOnly = fullText.contains("audio only") || fullText.contains("audio-only");
 
             String vcodec = "";
             String acodec = "";
@@ -62,6 +66,10 @@ public final class FormatParser {
                 }
             } else {
                 vcodec = parts.length > 0 ? parts[0] : "";
+            }
+
+            if (res.isBlank()) {
+                res = audioOnly ? "audio only" : "unknown";
             }
 
             list.add(new Format(id, ext, res, fps, size, tbr, vcodec, acodec, abr, audioOnly));

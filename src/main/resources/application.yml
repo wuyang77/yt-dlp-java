@@ -11,14 +11,21 @@ server:
 spring:
   application:
     name: yt-dlp-java
+  output:
+    ansi:
+      enabled: ALWAYS
 
-# 统一使用 ISO-8601 时间、级别、线程、Logger 和事件字段，便于终端检索
+# 启动完成后自动打开前端页面；若不需要可改为 false
+app:
+  open-browser: true
+
+# 使用 ANSI 颜色区分日志级别，同时保留 ISO-8601 时间和可检索字段
 logging:
   level:
     root: INFO
     "[org.wuyang.ytdlp]": INFO
   pattern:
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n"
+    console: "%clr(%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}){faint} %clr(%-5level){level} %clr([%thread]){cyan} %clr(%logger{36}){magenta} - %msg%n"
 
 # =====================================================
 # yt-dlp-java 业务配置

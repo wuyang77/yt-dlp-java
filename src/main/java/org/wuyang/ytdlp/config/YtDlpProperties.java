@@ -2,6 +2,9 @@ package org.wuyang.ytdlp.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * yt-dlp-java 业务配置属性
  *
@@ -20,6 +23,27 @@ public record YtDlpProperties(
         Youtube youtube,
         Download download
 ) {
+
+    public YtDlpProperties {
+        if (output == null) {
+            output = new Output("", "%(title)s [%(resolution)s].%(ext)s");
+        }
+        if (bin == null) {
+            bin = new Bin("", "", "", "");
+        }
+        if (pot == null) {
+            pot = new Pot("", 49300, "");
+        }
+        if (http == null) {
+            http = new Http("", "", null);
+        }
+        if (youtube == null) {
+            youtube = new Youtube("", 0);
+        }
+        if (download == null) {
+            download = new Download(3, 10, 10, 0, false);
+        }
+    }
 
     /**
      * 输出目录配置
@@ -71,7 +95,17 @@ public record YtDlpProperties(
 
         /** 获取客户端数组 */
         public String[] clientArray() {
-            return clients.split(",");
+            if (clients == null || clients.isBlank()) {
+                return new String[0];
+            }
+            List<String> clientList = new ArrayList<>();
+            for (String client : clients.split(",")) {
+                String trimmedClient = client.trim();
+                if (!trimmedClient.isEmpty()) {
+                    clientList.add(trimmedClient);
+                }
+            }
+            return clientList.toArray(new String[0]);
         }
     }
 

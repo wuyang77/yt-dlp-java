@@ -148,7 +148,8 @@ public class DownloadController {
 
     /** 在运行服务的 Windows 计算机上打开文件或其所在目录 */
     @PostMapping("/files/open")
-    public Map<String, Object> openFile(@RequestParam String path) {
+    public Map<String, Object> openFile(@RequestParam String path,
+                                        @RequestParam(defaultValue = "false") boolean directory) {
         try {
             Path outputDir = Path.of(properties.output().dir()).toAbsolutePath().normalize();
             Path target = Path.of(path).toAbsolutePath().normalize();
@@ -158,11 +159,17 @@ public class DownloadController {
             if (!System.getProperty("os.name").toLowerCase().contains("win")) {
                 return Map.of("success", false, "message", "打开文件功能目前仅支持 Windows");
             }
-            if (Files.isDirectory(target)) {
-                new ProcessBuilder("cmd.exe", "/c", "start", "", "explorer.exe", target.toString()).start();
+            if (directory) {
+                Path directoryPath = Files.isDirectory(target) ? target : target.getParent();
+                if (directoryPath == null || !Files.isDirectory(directoryPath)) {
+                    return Map.of("success", false, "message", "文件所在目录不存在");
+                }
+                new ProcessBuilder("explorer.exe", directoryPath.toString()).start();
             } else {
-                new ProcessBuilder("cmd.exe", "/c", "start", "", "explorer.exe", "/select,"
-                        + target).start();
+                if (!Files.isRegularFile(target)) {
+                    return Map.of("success", false, "message", "目标不是有效文件");
+                }
+                new ProcessBuilder("explorer.exe", "/select," + target).start();
             }
             return Map.of("success", true, "message", "已打开");
         } catch (Exception e) {
@@ -185,7 +192,10 @@ public class DownloadController {
         try {
             URI uri = new URI(candidate);
             String scheme = uri.getScheme();
-            return uri.getHost() != null && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+            if (uri.getHost() == null && !candidate.startsWith("http://") && !candidate.startsWith("https://")) {
+                return null;
+            }
+            return ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
                     ? candidate : null;
         } catch (URISyntaxException e) {
             return null;

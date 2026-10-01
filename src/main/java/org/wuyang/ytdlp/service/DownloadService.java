@@ -74,7 +74,7 @@ public class DownloadService {
         if (formats.isEmpty()) {
             log.warn("event=formats.empty url={} cookieMode={} lastClient={} potReady={}",
                 url, cookieMode, runner.lastClient(), potProvider.isReady());
-            return FormatListResponse.fail("无可用格式: cookies / PO Token / 客户端问题");
+            return FormatListResponse.fail(noFormatsMessage());
         }
         log.info("event=formats.success url={} count={} videoCount={} audioCount={}", url, formats.size(),
             formats.stream().filter(format -> !format.audioOnly()).count(),
@@ -110,7 +110,7 @@ public class DownloadService {
         if (formats.isEmpty()) {
             log.warn("event=download.formats_empty url={} mode={} lastClient={} potReady={}",
                     request.url(), request.mode(), runner.lastClient(), potProvider.isReady());
-            return DownloadResponse.fail("无可用格式: cookies / PO Token / 客户端问题");
+            return DownloadResponse.fail(noFormatsMessage());
         }
 
         // 自动选取最高码率的视频和音频
@@ -213,8 +213,17 @@ public class DownloadService {
         } catch (Exception e) {
             log.warn("event=formats.client_failed url={} client={} message={}", url, client, e.getMessage());
             log.debug("event=formats.client_failed_stack url={} client={}", url, client, e);
-            return new ClientFormats(client, "", List.of());
+            return new ClientFormats(client, e.getMessage() == null ? "" : e.getMessage(), List.of());
         }
+    }
+
+    private String noFormatsMessage() {
+        if (runner.needsBotCheck()) {
+            return "YouTube 要求验证“并非机器人”，当前请求的登录凭据可能无效、过期或未成功加载。"
+                    + "请确认 cookies.txt 是从已登录 YouTube 的浏览器导出的有效文件，"
+                    + "或切换为 Firefox 登录态后重试；若仍失败，可能是当前网络/IP 受到临时验证限制。";
+        }
+        return "无可用格式: cookies / PO Token / 客户端问题";
     }
 
     private record ClientFormats(String client, String output, List<Format> formats) {

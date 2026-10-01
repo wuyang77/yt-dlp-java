@@ -54,6 +54,7 @@ public class YtDlpRunner {
     /** 请求级诊断状态（ThreadLocal 保证线程隔离） */
     private final ThreadLocal<CookieMode> cookieMode = ThreadLocal.withInitial(() -> CookieMode.FILE);
     private final ThreadLocal<Boolean> detectedAgeLimit = ThreadLocal.withInitial(() -> false);
+    private final ThreadLocal<Boolean> detectedBotCheck = ThreadLocal.withInitial(() -> false);
     private final ThreadLocal<Boolean> detectedPotRequirement = ThreadLocal.withInitial(() -> false);
     private final ThreadLocal<String> lastActiveClient = ThreadLocal.withInitial(() -> "web_embedded");
 
@@ -74,6 +75,7 @@ public class YtDlpRunner {
     public void resetState() {
         cookieMode.set(CookieMode.FILE);
         detectedAgeLimit.set(false);
+        detectedBotCheck.set(false);
         detectedPotRequirement.set(false);
         lastActiveClient.set("web_embedded");
     }
@@ -92,6 +94,12 @@ public class YtDlpRunner {
     public boolean needsPot() {
         return detectedPotRequirement.get();
     }
+
+    /** 是否检测到 YouTube 要求进行机器人验证 */
+    public boolean needsBotCheck() {
+        return detectedBotCheck.get();
+    }
+
     /** 获取最后活跃的客户端 */
     public String lastClient() {
         return lastActiveClient.get();
@@ -247,6 +255,10 @@ public class YtDlpRunner {
     void updateDiagnostics(String output, String client) {
         String low = output.toLowerCase();
         if (low.contains("sign in to confirm your age")) detectedAgeLimit.set(true);
+        if (low.contains("not a bot") || low.contains("confirm you're not a bot")
+                || low.contains("confirm you’re not a bot")) {
+            detectedBotCheck.set(true);
+        }
         if (low.contains("gvs po token")) detectedPotRequirement.set(true);
         if (output.contains("PO Token Providers: bgutil")) lastActiveClient.set(client);
     }

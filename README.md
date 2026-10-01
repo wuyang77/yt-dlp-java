@@ -272,6 +272,8 @@ OK
 
 PO Token Provider 将在应用启动时自动初始化（下载二进制 → 启动进程 → 健康检查）。
 
+控制台日志使用 ANSI 颜色辅助区分级别：错误为红色、警告为黄色、信息为绿色；线程和 Logger 名称使用青色、洋红色。支持 ANSI 的终端（如 Windows Terminal、VS Code 集成终端）会显示颜色。
+
 ---
 
 ## 7. API 使用指南
@@ -523,6 +525,8 @@ curl -X POST http://localhost:8080/api/download \
 2. **检查 PO Token Provider**：访问 `http://127.0.0.1:49300/ping`，确认返回 200
 3. **检查 Node.js**：确认 `ytdlp.bin.node` 路径指向有效的 `node.exe`
 4. **检查网络**：确认能正常访问 YouTube
+
+若错误提示包含 **“Sign in to confirm you're not a bot”**，说明 YouTube 要求进行机器人验证，当前 cookies 可能无效、过期或未成功加载。请从已登录 YouTube 的浏览器重新导出有效的 `cookies.txt`，或改用 `cookieMode: FIREFOX`；若仍失败，可能是当前网络/IP 受到 YouTube 的临时验证限制。不要将 cookies 内容发到日志或公开渠道。
 
 ### 10.3 PO Token Provider 启动失败
 
