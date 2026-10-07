@@ -38,7 +38,7 @@
 |------|----------|----------|------|
 | **JDK** | 17+ | JDK 17.0.4.1 (Temurin) | 编译和运行 Spring Boot 应用 |
 | **Maven** | 3.8+ | Apache Maven 3.9.11 | 项目构建和依赖管理 |
-| **Node.js** | 18+ | Node.js 20.x | yt-dlp 的 JS 挑战求解运行时 |
+| **Node.js** | 20.19+ 或 22.12+ | Node.js 24.x | 前端构建及 yt-dlp 的 JS 挑战求解运行时 |
 | **操作系统** | Windows 10/11 x64 | Windows 11 23H2 | 宿主操作系统（二进制为 Windows x86_64） |
 
 ### 2.2 内置二进制依赖
@@ -81,6 +81,20 @@ Maven Toolchains 插件要求在 `~/.m2/toolchains.xml` 中配置 JDK 路径：
 ```
 yt-dlp-java/
 ├── pom.xml                                  # Maven 构建文件 (Spring Boot 4.1.1)
+├── frontend/                                # Vue 3 + Vite + TypeScript 前端
+│   ├── src/
+│   │   ├── components/                      # 页面组件
+│   │   ├── composables/                     # Vue 组合式状态与业务逻辑
+│   │   ├── services/                        # 后端 API 请求
+│   │   ├── types/                           # 前后端数据类型
+│   │   ├── views/                           # 页面级视图
+│   │   ├── App.vue                          # 页面组合入口
+│   │   ├── main.ts                          # Vue 应用入口
+│   │   └── style.css                        # 全局样式
+│   ├── index.html                           # Vite HTML 入口
+│   ├── package.json                         # 前端依赖与脚本
+│   └── vite.config.ts                       # Vite 开发代理和构建配置
+├── frontend-dist/                            # 前端构建产物（自动生成）
 ├── .gitignore                               # Git 忽略规则
 ├── README.md                                # 本文件
 ├── src/
@@ -165,7 +179,16 @@ ytdlp:
   # --- 下载参数 ---
   download:
     retries: 3                           # 下载失败重试次数
+
+  # --- 本地音轨语种识别（Whisper.cpp） ---
+  speech-recognition:
+    whisper-cli: whisper-cli              # whisper.cpp 命令行程序
+    model: models/ggml-base.bin           # 多语言 Whisper 模型路径
+    parallelism: 2                        # 同时识别的音轨数（最大 4）
+    sample-seconds: 12                    # 每条音轨取样秒数（5-30）
 ```
+
+未标注语言的音轨会并行提取开头片段，并由本机 Whisper.cpp 自动识别；音频不会上传到第三方。需自行准备 Whisper.cpp 的 `whisper-cli` 和多语言模型，并设置 `ytdlp.speech-recognition.whisper-cli` 与 `ytdlp.speech-recognition.model`。模型未配置时界面会显示“未配置本地识别”；识别失败或语音不足以判断时会显示对应状态。
 
 ### 4.3 配置项说明
 
@@ -177,6 +200,10 @@ ytdlp:
 | `ytdlp.bin.ffmpeg` | String | `src/main/resources/ffmpeg.exe` | ffmpeg 二进制路径 |
 | `ytdlp.bin.cookies` | String | `src/main/resources/cookies.txt` | cookies 文件路径 |
 | `ytdlp.bin.node` | String | `D:/dev/nvm/nodejs/node.exe` | Node.js 路径，需根据实际安装位置修改 |
+| `ytdlp.speech-recognition.whisper-cli` | String | `whisper-cli` | Whisper.cpp 命令行程序路径 |
+| `ytdlp.speech-recognition.model` | String | 空 | 多语言 Whisper 模型文件路径 |
+| `ytdlp.speech-recognition.parallelism` | int | `2` | 并发识别数，最大 4；提高会增加内存占用 |
+| `ytdlp.speech-recognition.sample-seconds` | int | `12` | 每条音轨用于语种识别的开头采样秒数 |
 | `ytdlp.pot.port` | int | `49300` | PO Token Provider HTTP 端口 |
 | `ytdlp.youtube.clients` | String | `web_embedded,tv,...` | 客户端策略，逗号分隔 |
 | `ytdlp.download.retries` | int | `3` | 下载重试次数 |
@@ -189,7 +216,7 @@ ytdlp:
 
 ### 5.1 前置条件
 
-确保已安装 JDK 17、Maven 3.8+、Node.js 18+，并完成 [环境变量配置](#23-环境变量配置)。
+确保已安装 JDK 17、Maven 3.8+、Node.js 20.19+ 或 22.12+，并完成 [环境变量配置](#23-环境变量配置)。
 
 ### 5.2 克隆项目
 
@@ -213,15 +240,25 @@ src/main/resources/
 
 ### 5.4 构建
 
+先构建前端静态文件（首次安装前端依赖时执行 `npm.cmd install`）：
+
+```bash
+cd frontend
+npm.cmd run build
+cd ..
+```
+
+开发前端时，可在 `frontend` 目录运行 `npm.cmd run dev`。Vite 会将 `/api` 请求代理到本机 Spring Boot 服务 `http://localhost:8080`。
+
 ```bash
 # 编译
 mvn clean compile
 
-# 打包为可执行 JAR（跳过测试）
-mvn package -DskipTests
+# 打包为可执行 JAR
+mvn package
 ```
 
-构建成功后，JAR 文件位于 `target/yt-dlp-java-1.0.0.jar`。
+Maven 会将 `frontend-dist/` 中的前端构建产物打包进 Spring Boot 的 `static/` 目录。构建成功后，JAR 文件位于 `target/yt-dlp-java-1.0.0.jar`。
 
 ---
 
@@ -230,6 +267,11 @@ mvn package -DskipTests
 ### 6.1 Maven 直接运行
 
 ```bash
+# 先构建一次前端（后续前端源码变化后重新构建）
+cd frontend
+npm.cmd run build
+cd ..
+
 mvn spring-boot:run
 ```
 
@@ -279,9 +321,9 @@ PO Token Provider 将在应用启动时自动初始化（下载二进制 → 启
 
 ## 7. 发布上线
 
-项目提供 Windows PowerShell 发布脚本 `deploy.ps1`。脚本会先执行 `mvn clean verify`，再将可执行 JAR、yt-dlp/ffmpeg 运行文件和 yt-dlp 插件复制到部署目录，启动 Spring Boot，并等待 `/api/health` 返回 `OK`。Maven 打包会排除本机运行二进制、插件目录和 `cookies.txt`；发布脚本也不会复制登录凭据，避免将其打包或覆盖。以下命令仅对本次 PowerShell 进程临时绕过执行策略，不会修改系统级策略。
+项目提供 Windows PowerShell 发布脚本 `deploy.ps1`。脚本会先用 `npm ci` 安装前端依赖并构建 Vue 应用，再执行 `mvn clean verify`，将可执行 JAR、yt-dlp/ffmpeg 运行文件和 yt-dlp 插件复制到部署目录，启动 Spring Boot，并等待 `/api/health` 返回 `OK`。Maven 打包会排除本机运行二进制、插件目录和 `cookies.txt`；发布脚本也不会复制登录凭据，避免将其打包或覆盖。以下命令仅对本次 PowerShell 进程临时绕过执行策略，不会修改系统级策略。
 
-**发布机要求：** Windows、JDK 17+、Maven 3.8+、Node.js 18+；项目运行所需的 `yt-dlp.exe`、`ffmpeg.exe`、`ffprobe.exe` 和 `src/main/resources/yt-dlp-plugins/` 必须已准备好。
+**发布机要求：** Windows、JDK 17+、Maven 3.8+、Node.js 20.19+ 或 22.12+；项目运行所需的 `yt-dlp.exe`、`ffmpeg.exe`、`ffprobe.exe` 和 `src/main/resources/yt-dlp-plugins/` 必须已准备好。
 
 ```powershell
 # 首次发布（默认目录：%LOCALAPPDATA%\yt-dlp-java；默认只监听本机 127.0.0.1:8080）

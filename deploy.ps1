@@ -141,16 +141,21 @@ function Get-NodeExecutable {
     } else {
         $command = Get-Command "node.exe" -ErrorAction SilentlyContinue
         if (-not $command) {
-            throw "Node.js was not found. Install Node.js 18+ or specify node.exe with -NodePath."
+            throw "Node.js was not found. Install Node.js 20.19+ or specify node.exe with -NodePath."
         }
         $candidate = $command.Source
     }
     $versionOutput = & $candidate --version
-    if ($LASTEXITCODE -ne 0 -or $versionOutput -notmatch "^v?(\d+)\.") {
+    if ($LASTEXITCODE -ne 0 -or $versionOutput -notmatch "^v?(\d+)\.(\d+)") {
         throw "Could not read the Node.js version: $candidate"
     }
-    if ([int]$Matches[1] -lt 18) {
-        throw "Node.js 18+ is required. Current version: $versionOutput"
+    $nodeMajor = [int]$Matches[1]
+    $nodeMinor = [int]$Matches[2]
+    $supportedVersion = ($nodeMajor -eq 20 -and $nodeMinor -ge 19) -or
+        ($nodeMajor -eq 22 -and $nodeMinor -ge 12) -or
+        $nodeMajor -gt 22
+    if (-not $supportedVersion) {
+        throw "Node.js 20.19+ or 22.12+ is required. Current version: $versionOutput"
     }
     return $candidate
 }
@@ -257,15 +262,37 @@ function Publish-Application {
         throw "Maven was not found. Install Maven 3.8+ and add mvn to PATH."
     }
 
-    Write-Host "Running Maven verification and packaging..."
+    $npm = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
+    if (-not $npm) {
+        $npm = Get-Command "npm" -ErrorAction SilentlyContinue
+    }
+    if (-not $npm) {
+        throw "npm was not found. Install Node.js 20.19+ and add npm to PATH."
+    }
+
+    $node = Get-NodeExecutable
+    $previousPath = $env:PATH
+    $env:PATH = "$(Split-Path -Parent $node);$previousPath"
     Push-Location $ProjectDir
     try {
+        Write-Host "Installing frontend dependencies and building the Vue application..."
+        & $npm.Source --prefix (Join-Path $ProjectDir "frontend") ci
+        if ($LASTEXITCODE -ne 0) {
+            throw "Frontend dependency installation failed with exit code $LASTEXITCODE."
+        }
+        & $npm.Source --prefix (Join-Path $ProjectDir "frontend") run build
+        if ($LASTEXITCODE -ne 0) {
+            throw "Frontend build failed with exit code $LASTEXITCODE."
+        }
+
+        Write-Host "Running Maven verification and packaging..."
         & $maven.Source -B clean verify
         if ($LASTEXITCODE -ne 0) {
             throw "Maven build failed with exit code $LASTEXITCODE."
         }
     } finally {
         Pop-Location
+        $env:PATH = $previousPath
     }
 
     $sourceJar = Get-ChildItem -LiteralPath (Join-Path $ProjectDir "target") -Filter $JarNamePattern -File |

@@ -273,6 +273,33 @@ public class YtDlpRunner {
         return String.join("\n", capturePreviewOutput(cmd, "读取预览选项"));
     }
 
+    /** Retrieve structured format metadata for one YouTube player client. */
+    public String getFormatInfoJson(String url, String client) throws IOException, InterruptedException {
+        List<String> cmd = baseCmd();
+        cmd.addAll(List.of(
+                "--extractor-args", "youtube:player_client=" + client,
+                "--no-warnings", "--no-playlist", "--skip-download", "--dump-single-json", url));
+        return String.join("\n", capturePreviewOutput(cmd, "读取媒体格式"));
+    }
+
+    /** Resolve a single audio stream for local speech recognition without logging its signed URL. */
+    public String resolveAudioStreamUrl(String url, String requestedCookieMode, String audioFormatId)
+            throws IOException, InterruptedException {
+        resetState();
+        setCookieMode(parseCookieMode(requestedCookieMode));
+        if (!isFormatId(audioFormatId)) {
+            throw new IOException("无效的音频格式编号");
+        }
+        List<String> cmd = baseCmd();
+        cmd.addAll(List.of("--no-warnings", "--no-playlist", "-f", audioFormatId, "-g", url));
+        List<String> lines = capturePreviewOutput(cmd, "解析音频地址");
+        return lines.stream()
+                .map(line -> line.trim())
+                .filter(line -> line.startsWith("https://"))
+                .findFirst()
+                .orElseThrow(() -> new IOException("yt-dlp 未返回可识别的音频地址"));
+    }
+
     /** Download selected source subtitles into a caller-owned temporary directory. */
     public void downloadPreviewSubtitles(String url, String requestedCookieMode, String languages, Path outputTemplate)
             throws IOException, InterruptedException {

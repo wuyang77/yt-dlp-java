@@ -57,6 +57,10 @@
     <build>
         <resources>
             <resource>
+                <directory>frontend-dist</directory>
+                <targetPath>static</targetPath>
+            </resource>
+            <resource>
                 <directory>src/main/resources</directory>
                 <excludes>
                     <exclude>cookies.txt</exclude>

@@ -1,6 +1,7 @@
 package org.wuyang.ytdlp.service;
 
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,12 +43,18 @@ public class DownloadService {
     private final YtDlpRunner runner;
     private final PotProvider potProvider;
     private final YtDlpProperties props;
+    private final ObjectMapper objectMapper;
+    private final AudioLanguageRecognitionService audioLanguageRecognitionService;
     private final ExecutorService formatExecutor;
 
-    public DownloadService(YtDlpRunner runner, PotProvider potProvider, YtDlpProperties props) {
+    public DownloadService(YtDlpRunner runner, PotProvider potProvider, YtDlpProperties props,
+                           ObjectMapper objectMapper,
+                           AudioLanguageRecognitionService audioLanguageRecognitionService) {
         this.runner = runner;
         this.potProvider = potProvider;
         this.props = props;
+        this.objectMapper = objectMapper;
+        this.audioLanguageRecognitionService = audioLanguageRecognitionService;
         int clientCount = props.youtube().clientArray().length;
         int parallelism = props.youtube().parallelism() > 0 ? props.youtube().parallelism() : 4;
         this.formatExecutor = Executors.newFixedThreadPool(Math.min(parallelism, Math.max(1, clientCount)));
@@ -79,7 +86,8 @@ public class DownloadService {
         log.info("event=formats.success url={} count={} videoCount={} audioCount={}", url, formats.size(),
             formats.stream().filter(format -> !format.audioOnly()).count(),
             formats.stream().filter(format -> format.audioOnly()).count());
-        return FormatListResponse.ok(formats);
+        List<Format> identifiedFormats = audioLanguageRecognitionService.recognize(url, cookieMode, formats);
+        return FormatListResponse.ok(identifiedFormats);
     }
 
     /**
@@ -203,13 +211,9 @@ public class DownloadService {
     private ClientFormats tryList(String url, String client, YtDlpRunner.CookieMode requestCookieMode) {
         try {
             runner.setCookieMode(requestCookieMode);
-            List<String> cmd = runner.baseCmd();
-            cmd.addAll(List.of(
-                    "--extractor-args", "youtube:player_client=" + client,
-                    "-F", url));
-            String out = runner.run(cmd);
+            String out = runner.getFormatInfoJson(url, client);
 
-            return new ClientFormats(client, out, FormatParser.parse(out));
+            return new ClientFormats(client, out, FormatParser.parseJson(out, objectMapper));
         } catch (Exception e) {
             log.warn("event=formats.client_failed url={} client={} message={}", url, client, e.getMessage());
             log.debug("event=formats.client_failed_stack url={} client={}", url, client, e);

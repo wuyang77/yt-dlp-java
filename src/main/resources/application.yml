@@ -64,3 +64,10 @@ ytdlp:
     http-retries: 10
     http-chunk-size: 10
     force-ipv4: true
+
+  # 本地音轨语种识别（Whisper.cpp）；需自行安装 whisper-cli 并下载 ggml 模型
+  speech-recognition:
+    whisper-cli: whisper-cli
+    model: ""
+    parallelism: 2
+    sample-seconds: 12

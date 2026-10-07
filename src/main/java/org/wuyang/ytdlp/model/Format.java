@@ -21,8 +21,15 @@ public record Format(
         String vcodec,
         String acodec,
         String abr,
+        String language,
+        String languageStatus,
         boolean audioOnly
 ) {
+
+    public Format withLanguage(String detectedLanguage, String status) {
+        return new Format(id, ext, res, fps, size, tbr, vcodec, acodec, abr,
+                detectedLanguage, status, audioOnly);
+    }
 
     /** 解析视频高度（像素），用于排序和显示 */
     public int height() {

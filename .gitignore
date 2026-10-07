@@ -15,6 +15,10 @@ target/
 *.jar
 !src/main/resources/*.jar
 
+# --- Vue frontend build artifacts ---
+frontend/node_modules/
+frontend-dist/
+
 # --- 二进制依赖（体积大，不纳入版本控制） ---
 src/main/resources/*.exe
 src/main/resources/*.dll

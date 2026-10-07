@@ -13,11 +13,15 @@ import org.wuyang.ytdlp.config.YtDlpProperties;
 import org.wuyang.ytdlp.service.DownloadService;
 import org.wuyang.ytdlp.service.DownloadTaskService;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Base64;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 下载 REST 控制器
@@ -169,12 +173,71 @@ public class DownloadController {
                 if (!Files.isRegularFile(target)) {
                     return Map.of("success", false, "message", "目标不是有效文件");
                 }
-                new ProcessBuilder("explorer.exe", "/select," + target).start();
+                openFileInExplorer(target);
             }
-            return Map.of("success", true, "message", "已打开");
+            return Map.of("success", true, "message",
+                    directory ? "已打开所在目录" : "已在资源管理器中定位文件");
         } catch (Exception e) {
             log.error("event=file.open_failed path={} message={}", path, e.getMessage(), e);
             return Map.of("success", false, "message", "无法打开: " + e.getMessage());
+        }
+    }
+
+    private static void openFileInExplorer(Path target) throws IOException {
+        String escapedPath = target.toString().replace("'", "''");
+        String script = """
+                $ErrorActionPreference = 'Stop'
+                $target = [IO.Path]::GetFullPath('%s')
+                $directory = [IO.Path]::GetDirectoryName($target)
+                $shell = New-Object -ComObject Shell.Application
+                $shell.Explore($directory)
+                Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class ExplorerWindow { [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }'
+                $deadline = [DateTime]::UtcNow.AddSeconds(10)
+                while ([DateTime]::UtcNow -lt $deadline) {
+                    $matchedWindow = $null
+                    foreach ($window in $shell.Windows()) {
+                        try {
+                            $windowPath = [IO.Path]::GetFullPath([string]$window.Document.Folder.Self.Path)
+                            if ([string]::Equals($windowPath, $directory, [StringComparison]::OrdinalIgnoreCase)) {
+                                $matchedWindow = $window
+                                break
+                            }
+                        } catch { }
+                    }
+                    if ($null -ne $matchedWindow) {
+                        $item = $matchedWindow.Document.Folder.ParseName([IO.Path]::GetFileName($target))
+                        if ($null -eq $item) { throw 'Explorer could not find the downloaded file.' }
+                        $matchedWindow.Document.SelectItem($item, 1 -bor 4 -bor 8 -bor 16)
+                        $handle = [IntPtr]$matchedWindow.HWND
+                        [void][ExplorerWindow]::ShowWindowAsync($handle, 9)
+                        if (-not [ExplorerWindow]::SetForegroundWindow($handle) -and [ExplorerWindow]::GetForegroundWindow() -ne $handle) {
+                            throw 'Explorer selected the file, but Windows did not allow its window to come to the foreground.'
+                        }
+                        exit 0
+                    }
+                    Start-Sleep -Milliseconds 150
+                }
+                throw 'Timed out waiting for the Explorer window.'
+                """ .formatted(escapedPath);
+        String encodedScript = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_16LE));
+        Process process = new ProcessBuilder("powershell.exe", "-NoLogo", "-NoProfile",
+                "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodedScript)
+                .redirectErrorStream(true)
+                .start();
+        try {
+            if (!process.waitFor(15, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IllegalStateException("Timed out while selecting the downloaded file in Explorer");
+            }
+        } catch (InterruptedException e) {
+            process.destroyForcibly();
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while selecting the downloaded file in Explorer", e);
+        }
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+        if (process.exitValue() != 0) {
+            throw new IllegalStateException(output.isEmpty()
+                    ? "Explorer could not select the downloaded file" : output);
         }
     }
 

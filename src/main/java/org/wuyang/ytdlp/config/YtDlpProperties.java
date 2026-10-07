@@ -21,7 +21,8 @@ public record YtDlpProperties(
         Pot pot,
         Http http,
         Youtube youtube,
-        Download download
+        Download download,
+        SpeechRecognition speechRecognition
 ) {
 
     public YtDlpProperties {
@@ -42,6 +43,9 @@ public record YtDlpProperties(
         }
         if (download == null) {
             download = new Download(3, 10, 10, 0, false);
+        }
+        if (speechRecognition == null) {
+            speechRecognition = new SpeechRecognition("", "", 2, 12);
         }
     }
 
@@ -120,5 +124,9 @@ public record YtDlpProperties(
      */
     public record Download(int retries, int fragmentRetries, int httpRetries,
                           int httpChunkSize, boolean forceIpv4) {
+    }
+
+    /** Local Whisper.cpp language detection settings. */
+    public record SpeechRecognition(String whisperCli, String model, int parallelism, int sampleSeconds) {
     }
 }
