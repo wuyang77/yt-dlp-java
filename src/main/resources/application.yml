@@ -39,6 +39,12 @@ ytdlp:
     cookies: src/main/resources/cookies.txt
     node: D:/dev/nvm/nodejs/node.exe
 
+  # yt-dlp 自动更新：应用启动后后台异步执行自更新，失败仅记日志不影响运行
+  auto-update:
+    enabled: true
+    # 更新通道：stable 稳定版 / nightly 每日构建（当月最新）/ master 开发版
+    channel: nightly
+
   # PO Token Provider
   pot:
     path: src/main/resources/bgutil-pot.exe

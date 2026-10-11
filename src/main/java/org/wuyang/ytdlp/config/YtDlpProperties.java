@@ -22,12 +22,16 @@ public record YtDlpProperties(
         Http http,
         Youtube youtube,
         Download download,
-        SpeechRecognition speechRecognition
+        SpeechRecognition speechRecognition,
+        AutoUpdate autoUpdate
 ) {
 
     public YtDlpProperties {
         if (output == null) {
             output = new Output("", "%(title)s [%(resolution)s].%(ext)s");
+        }
+        if (autoUpdate == null) {
+            autoUpdate = new AutoUpdate(true, "stable");
         }
         if (bin == null) {
             bin = new Bin("", "", "", "");
@@ -128,5 +132,15 @@ public record YtDlpProperties(
 
     /** Local Whisper.cpp language detection settings. */
     public record SpeechRecognition(String whisperCli, String model, int parallelism, int sampleSeconds) {
+    }
+
+    /**
+     * yt-dlp 自动更新配置
+     *
+     * @param enabled 是否在应用启动时自动执行 yt-dlp 自更新
+     * @param channel 更新通道：stable 稳定版 / nightly 每日构建 / master 开发版；
+     *                留空表示沿用二进制当前所在通道
+     */
+    public record AutoUpdate(boolean enabled, String channel) {
     }
 }
