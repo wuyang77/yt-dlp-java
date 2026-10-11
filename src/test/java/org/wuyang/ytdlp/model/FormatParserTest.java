@@ -63,7 +63,7 @@ class YtDlpPropertiesTest {
 
     @Test
     void providesSafeDefaultsAndClientArray() {
-        YtDlpProperties props = new YtDlpProperties(null, null, null, null, null, null, null);
+        YtDlpProperties props = new YtDlpProperties(null, null, null, null, null, null, null, null);
 
         assertNotNull(props.output());
         assertNotNull(props.bin());

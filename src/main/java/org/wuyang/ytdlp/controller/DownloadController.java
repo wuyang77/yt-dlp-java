@@ -191,7 +191,7 @@ public class DownloadController {
                 $directory = [IO.Path]::GetDirectoryName($target)
                 $shell = New-Object -ComObject Shell.Application
                 $shell.Explore($directory)
-                Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class ExplorerWindow { [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }'
+                Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class ExplorerWindow { [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern bool FlashWindow(IntPtr hWnd, bool bInvert); }'
                 $deadline = [DateTime]::UtcNow.AddSeconds(10)
                 while ([DateTime]::UtcNow -lt $deadline) {
                     $matchedWindow = $null
@@ -211,7 +211,9 @@ public class DownloadController {
                         $handle = [IntPtr]$matchedWindow.HWND
                         [void][ExplorerWindow]::ShowWindowAsync($handle, 9)
                         if (-not [ExplorerWindow]::SetForegroundWindow($handle) -and [ExplorerWindow]::GetForegroundWindow() -ne $handle) {
-                            throw 'Explorer selected the file, but Windows did not allow its window to come to the foreground.'
+                            # Windows 限制后台进程抢占前台焦点，这是正常现象；
+                            # 文件已被选中，降级为闪烁任务栏按钮提示用户，不作为失败处理
+                            [void][ExplorerWindow]::FlashWindow($handle, $true)
                         }
                         exit 0
                     }

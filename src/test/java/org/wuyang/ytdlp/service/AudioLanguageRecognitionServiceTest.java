@@ -26,7 +26,7 @@ class AudioLanguageRecognitionServiceTest {
     @Test
     void reportsMissingLocalEngineAndKeepsMetadataLanguages() throws Exception {
         YtDlpProperties props = new YtDlpProperties(null, null, null, null, null, null,
-                new YtDlpProperties.SpeechRecognition("", "", 2, 12));
+                new YtDlpProperties.SpeechRecognition("", "", 2, 12), null);
         AudioLanguageRecognitionService service = new AudioLanguageRecognitionService(
                 mock(YtDlpRunner.class), props, JsonMapper.builder().build());
         List<Format> formats = FormatParser.parseJson("""
