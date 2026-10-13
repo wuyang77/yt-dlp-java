@@ -59,9 +59,11 @@ ytdlp:
   # YouTube 客户端策略（按优先级排列）
   youtube:
     # web_creator 需要账号 Cookie；GVS PO Token 由 bgutil HTTP Provider 自动获取
-    clients: web_creator,web_embedded,tv,tv_downgraded,android_vr
+    # 注意：tv、tv_downgraded、android_vr 已被 YouTube 停用（报 The page needs
+    # to be reloaded），不可用，仅保留 web 系客户端
+    clients: web_creator,web_embedded,web
     # 并发探测客户端数量；建议 3-4，过高可能触发 YouTube 限流
-    parallelism: 4
+    parallelism: 3
 
   # 下载参数
   download:

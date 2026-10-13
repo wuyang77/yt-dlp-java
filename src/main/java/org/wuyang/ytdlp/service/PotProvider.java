@@ -1,5 +1,6 @@
 package org.wuyang.ytdlp.service;
 
+import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,7 @@ public class PotProvider {
     private final int port;
     private final String downloadUrl;
     private final String baseUrl;
+    private final String proxy;
 
     private Process process;
     private boolean ready = false;
@@ -49,6 +51,28 @@ public class PotProvider {
         this.port = props.pot().port();
         this.downloadUrl = props.pot().downloadUrl();
         this.baseUrl = "http://127.0.0.1:" + port;
+        this.proxy = toHttpProxy(props.http().proxy());
+    }
+
+    /**
+     * 将配置的代理地址转换为 Provider 子进程可用的 HTTP 代理地址。
+     *
+     * <p>Mieru 在同一端口同时支持 SOCKS5 与 HTTP 两种协议；bgutil-pot 的
+     * HTTP 客户端对 SOCKS 的支持取决于编译特性，而 HTTP 代理必定可用，
+     * 因此统一把 socks 开头的地址改写为 http 方案。未配置时返回 {@code null}。</p>
+     */
+    private static String toHttpProxy(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.regionMatches(true, 0, "socks", 0, 5)) {
+            int schemeEnd = trimmed.indexOf("://");
+            if (schemeEnd > 0) {
+                return "http" + trimmed.substring(schemeEnd);
+            }
+        }
+        return trimmed;
     }
 
     /** 获取 Provider 的 HTTP 基础 URL */
@@ -82,9 +106,17 @@ public class PotProvider {
         }
     }
 
-    /** 启动 Provider 进程并等待就绪 */
+    /**
+     * 启动 Provider 进程并等待就绪。
+     *
+     * <p>每次启动前先杀掉残留的 bgutil-pot 进程，确保不会复用上一次
+     * 未带代理的旧进程（应用异常退出时子进程会残留，ping 成功但无代理）。</p>
+     */
     public void start() {
         if (!Files.exists(Path.of(exePath))) return;
+
+        // 杀掉残留进程，避免复用无代理的旧实例
+        killStaleProcess();
 
         if (ping()) {
             ready = true;
@@ -97,6 +129,13 @@ public class PotProvider {
             ProcessBuilder pb = new ProcessBuilder(
                     Path.of(exePath).toString(),
                     "server", "--host", "127.0.0.1", "--port", String.valueOf(port));
+            // Provider 需要访问 YouTube 的 BotGuard 接口，必须走代理；
+            // 通过标准环境变量把代理传递给子进程（其 HTTP 客户端会自动读取）
+            if (proxy != null) {
+                pb.environment().put("HTTPS_PROXY", proxy);
+                pb.environment().put("HTTP_PROXY", proxy);
+                log.info("event=pot.proxy_configured proxy={}", proxy);
+            }
             pb.redirectErrorStream(true);
             pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
             process = pb.start();
@@ -125,6 +164,35 @@ public class PotProvider {
                 Thread.currentThread().interrupt();
                 log.warn("event=pot.stop_interrupted endpoint={} message={}", baseUrl, e.getMessage(), e);
             }
+        }
+    }
+
+    /** 应用关闭时自动停止 Provider，防止进程残留 */
+    @PreDestroy
+    public void onDestroy() {
+        stop();
+    }
+
+    /**
+     * 杀掉残留的 bgutil-pot 进程。
+     *
+     * <p>应用异常退出（Ctrl+C / kill）时子进程不会被清理，下次启动时
+     * ping 成功但旧进程无代理环境变量，BotGuard 调用必然失败。
+     * 通过 taskkill 清理后再由本实例重新启动带代理的进程。</p>
+     */
+    private void killStaleProcess() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("taskkill", "/F", "/IM", "bgutil-pot.exe");
+            pb.redirectErrorStream(true);
+            pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            Process p = pb.start();
+            p.waitFor(3, TimeUnit.SECONDS);
+            if (p.exitValue() == 0) {
+                log.info("event=pot.stale_killed");
+                Thread.sleep(500); // 等端口释放
+            }
+        } catch (Exception e) {
+            log.debug("event=pot.kill_stale_failed message={}", e.getMessage());
         }
     }
 
