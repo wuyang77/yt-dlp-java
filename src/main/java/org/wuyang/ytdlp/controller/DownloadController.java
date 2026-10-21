@@ -61,14 +61,16 @@ public class DownloadController {
     @GetMapping("/formats")
     public FormatListResponse getFormats(
             @RequestParam String url,
-            @RequestParam(defaultValue = "FILE") String cookieMode) {
+            @RequestParam(defaultValue = "FILE") String cookieMode,
+            @RequestParam(required = false) String proxy) {
         String cleanUrl = normalizeUrl(url);
         if (cleanUrl == null) {
             log.warn("event=http.formats_rejected reason=invalid_url");
             return FormatListResponse.fail("请输入有效的视频链接");
         }
+        String cleanProxy = normalizeProxy(proxy);
         log.info("event=http.formats url={} cookieMode={}", cleanUrl, cookieMode);
-        return downloadService.listFormats(cleanUrl, cookieMode);
+        return downloadService.listFormats(cleanUrl, cookieMode, cleanProxy);
     }
 
     /**
@@ -97,11 +99,12 @@ public class DownloadController {
             log.warn("event=http.download_rejected reason=invalid_url");
             return DownloadResponse.fail("请输入有效的视频链接");
         }
-        request = new DownloadRequest(cleanUrl, request.mode(), request.cookieMode(), request.formatId());
+        request = new DownloadRequest(cleanUrl, request.mode(), request.cookieMode(), request.formatId(),
+                normalizeProxy(request.proxy()));
         log.info("event=http.download url={} mode={} cookieMode={}", cleanUrl, request.mode(), request.cookieMode());
         if (request.mode() == null) {
             request = new DownloadRequest(request.url(), org.wuyang.ytdlp.model.DownloadMode.BEST_MERGE,
-                    request.cookieMode(), request.formatId());
+                    request.cookieMode(), request.formatId(), request.proxy());
         }
         return downloadService.download(request);
     }
@@ -118,12 +121,13 @@ public class DownloadController {
             log.warn("event=http.download_async_rejected reason=invalid_url");
             throw new IllegalArgumentException("请输入有效的视频链接");
         }
-        request = new DownloadRequest(cleanUrl, request.mode(), request.cookieMode(), request.formatId());
+        request = new DownloadRequest(cleanUrl, request.mode(), request.cookieMode(), request.formatId(),
+                normalizeProxy(request.proxy()));
         log.info("event=http.download_async url={} mode={} cookieMode={}",
                 cleanUrl, request.mode(), request.cookieMode());
         if (request.mode() == null) {
             request = new DownloadRequest(request.url(), org.wuyang.ytdlp.model.DownloadMode.BEST_MERGE,
-                    request.cookieMode(), request.formatId());
+                    request.cookieMode(), request.formatId(), request.proxy());
         }
         return taskService.start(request);
     }
@@ -264,6 +268,26 @@ public class DownloadController {
                     ? candidate : null;
         } catch (URISyntaxException e) {
             return null;
+        }
+    }
+
+    private static String normalizeProxy(String proxy) {
+        if (proxy == null || proxy.isBlank()) {
+            return null;
+        }
+        try {
+            URI uri = new URI(proxy.trim());
+            String scheme = uri.getScheme();
+            if (scheme == null || !java.util.Set.of("http", "https", "socks4", "socks4a", "socks5", "socks5h")
+                    .contains(scheme.toLowerCase(java.util.Locale.ROOT))
+                    || uri.getHost() == null || uri.getPort() > 65535
+                    || (uri.getRawPath() != null && !uri.getRawPath().isEmpty() && !uri.getRawPath().equals("/"))
+                    || uri.getRawQuery() != null || uri.getRawFragment() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "代理地址格式无效，请输入带协议的代理地址");
+            }
+            return uri.toASCIIString();
+        } catch (URISyntaxException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "代理地址格式无效，请输入带协议的代理地址", e);
         }
     }
 }

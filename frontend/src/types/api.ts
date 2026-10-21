@@ -48,4 +48,5 @@ export interface StartDownloadRequest {
   mode: DownloadMode;
   cookieMode: CookieMode;
   formatId: string;
+  proxy: string;
 }

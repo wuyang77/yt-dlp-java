@@ -8,6 +8,7 @@ import { useDownloader } from '@/composables/useDownloader';
 
 const {
   url,
+  proxy,
   cookieMode,
   formats,
   videos,
@@ -53,6 +54,7 @@ const {
     <main class="workspace">
       <DownloadSettings
         v-model:cookie-mode="cookieMode"
+        v-model:proxy="proxy"
         :url="url"
         :loading="loading"
         :error="error"

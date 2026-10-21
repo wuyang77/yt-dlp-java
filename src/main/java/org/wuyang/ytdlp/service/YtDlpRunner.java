@@ -58,6 +58,7 @@ public class YtDlpRunner {
 
     /** 请求级诊断状态（ThreadLocal 保证线程隔离） */
     private final ThreadLocal<CookieMode> cookieMode = ThreadLocal.withInitial(() -> CookieMode.FILE);
+    private final ThreadLocal<String> proxyOverride = new ThreadLocal<>();
     private final ThreadLocal<Boolean> detectedAgeLimit = ThreadLocal.withInitial(() -> false);
     private final ThreadLocal<Boolean> detectedBotCheck = ThreadLocal.withInitial(() -> false);
     private final ThreadLocal<Boolean> detectedPotRequirement = ThreadLocal.withInitial(() -> false);
@@ -79,6 +80,7 @@ public class YtDlpRunner {
     /** 重置诊断状态（每次请求前调用） */
     public void resetState() {
         cookieMode.set(CookieMode.FILE);
+        proxyOverride.remove();
         detectedAgeLimit.set(false);
         detectedBotCheck.set(false);
         detectedPotRequirement.set(false);
@@ -88,6 +90,15 @@ public class YtDlpRunner {
     /** 设置 Cookie 来源模式 */
     public void setCookieMode(CookieMode mode) {
         cookieMode.set(mode);
+    }
+
+    /** Set a request-specific proxy; null falls back to the server configuration. */
+    public void setProxy(String proxy) {
+        if (proxy == null || proxy.isBlank()) {
+            proxyOverride.remove();
+        } else {
+            proxyOverride.set(proxy.trim());
+        }
     }
 
     /** 是否检测到年龄限制 */
@@ -445,8 +456,12 @@ public class YtDlpRunner {
         if (downloadConfig.forceIpv4()) {
             cmd.add("--force-ipv4");
         }
-        if (proxy != null && !proxy.isBlank()) {
-            cmd.add("--proxy"); cmd.add(proxy.trim());
+        String activeProxy = proxyOverride.get();
+        if (activeProxy == null) {
+            activeProxy = proxy;
+        }
+        if (activeProxy != null && !activeProxy.isBlank()) {
+            cmd.add("--proxy"); cmd.add(activeProxy.trim());
         }
     }
 

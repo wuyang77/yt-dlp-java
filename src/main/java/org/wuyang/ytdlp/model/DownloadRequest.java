@@ -7,6 +7,7 @@ package org.wuyang.ytdlp.model;
  * @param mode      下载方式
  * @param cookieMode Cookie 来源（FILE / FIREFOX / NONE）
  * @param formatId  自定义格式ID（mode 为 CUSTOM 时使用）
+ * @param proxy     请求级网络代理地址
  *
  * @author wuyang
  */
@@ -14,6 +15,10 @@ public record DownloadRequest(
         String url,
         DownloadMode mode,
         String cookieMode,
-        String formatId
+        String formatId,
+        String proxy
 ) {
+    public DownloadRequest(String url, DownloadMode mode, String cookieMode, String formatId) {
+        this(url, mode, cookieMode, formatId, null);
+    }
 }

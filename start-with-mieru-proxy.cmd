@@ -158,11 +158,15 @@ cd /d "%PROJECT_DIR%"
 
 echo.
 echo Starting yt-dlp-java with the Mieru SOCKS5 proxy.
-echo When startup completes, open http://localhost:8080 and enter the video URL.
+echo App will auto-open in AllTools Chrome when ready (proxy enabled for YouTube).
 echo Press Ctrl+C in this window to stop yt-dlp-java.
 echo.
 rem 以前台方式运�?Spring Boot 应用；该 Java 进程会继承本脚本中设置的
 rem YTDLP_HTTP_PROXY 代理环境变量，启动后可在浏览器访�?http://localhost:8080
+rem ��̨�ȴ�Ӧ�þ������ڴ������� AllTools Chrome �д�ҳ��
+rem Chrome �� --proxy-server ��������Զ��ƹ� localhost�����Ա���ҳ��ֱ����
+rem YouTube ���ⲿ��Դ�ߴ�����ʵ��ǰ��ҳ��Ҳ�ܷ�ǽ
+start /b "" powershell.exe -NoProfile -WindowStyle Hidden -Command "$d=[DateTime]::UtcNow.AddSeconds(120); while([DateTime]::UtcNow -lt $d){try{$r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8080/api/health' -TimeoutSec 2; if($r.Content.Trim() -eq 'OK'){break}}catch{};Start-Sleep -Seconds 2}; if([DateTime]::UtcNow -lt $d){Start-Process -FilePath 'D:\Chrome153_AllNew_2026.9.12\App\chrome.exe' -ArgumentList '--user-data-dir=D:\Chrome153_AllNew_2026.9.12\Data','--proxy-server=socks5://127.0.0.1:3080','--proxy-bypass-list=localhost;127.0.0.1','http://localhost:8080'}"
 call mvn spring-boot:run
 rem �?Maven 的退出码透传作为本脚本的退出码�?b 表示仅退出当前批处理脚本�?
 rem 而不关闭父级 cmd 窗口

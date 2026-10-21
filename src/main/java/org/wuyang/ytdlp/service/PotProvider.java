@@ -17,6 +17,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -41,7 +42,8 @@ public class PotProvider {
     private final int port;
     private final String downloadUrl;
     private final String baseUrl;
-    private final String proxy;
+    private final String defaultProxy;
+    private String proxy;
 
     private Process process;
     private boolean ready = false;
@@ -51,7 +53,8 @@ public class PotProvider {
         this.port = props.pot().port();
         this.downloadUrl = props.pot().downloadUrl();
         this.baseUrl = "http://127.0.0.1:" + port;
-        this.proxy = toHttpProxy(props.http().proxy());
+        this.defaultProxy = toHttpProxy(props.http().proxy());
+        this.proxy = defaultProxy;
     }
 
     /**
@@ -85,6 +88,23 @@ public class PotProvider {
         return ready;
     }
 
+    /** Apply the request's proxy to the provider process, falling back to the server default. */
+    public synchronized void configureProxy(String requestProxy) {
+        String nextProxy = requestProxy == null || requestProxy.isBlank()
+                ? defaultProxy : toHttpProxy(requestProxy);
+        if (Objects.equals(proxy, nextProxy)) {
+            if (!ready) {
+                start();
+            }
+            return;
+        }
+        proxy = nextProxy;
+        if (ready || (process != null && process.isAlive())) {
+            stop();
+            start();
+        }
+    }
+
     /** 确保二进制存在，不存在则自动下载 */
     public void ensureBinary() {
         if (Files.exists(Path.of(exePath))) {
@@ -112,7 +132,7 @@ public class PotProvider {
      * <p>每次启动前先杀掉残留的 bgutil-pot 进程，确保不会复用上一次
      * 未带代理的旧进程（应用异常退出时子进程会残留，ping 成功但无代理）。</p>
      */
-    public void start() {
+    public synchronized void start() {
         if (!Files.exists(Path.of(exePath))) return;
 
         // 杀掉残留进程，避免复用无代理的旧实例
@@ -134,7 +154,7 @@ public class PotProvider {
             if (proxy != null) {
                 pb.environment().put("HTTPS_PROXY", proxy);
                 pb.environment().put("HTTP_PROXY", proxy);
-                log.info("event=pot.proxy_configured proxy={}", proxy);
+                log.info("event=pot.proxy_configured");
             }
             pb.redirectErrorStream(true);
             pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
@@ -155,7 +175,7 @@ public class PotProvider {
     }
 
     /** 停止 Provider 进程 */
-    public void stop() {
+    public synchronized void stop() {
         if (process != null && process.isAlive()) {
             process.destroy();
             try {
@@ -165,6 +185,8 @@ public class PotProvider {
                 log.warn("event=pot.stop_interrupted endpoint={} message={}", baseUrl, e.getMessage(), e);
             }
         }
+        process = null;
+        ready = false;
     }
 
     /** 应用关闭时自动停止 Provider，防止进程残留 */

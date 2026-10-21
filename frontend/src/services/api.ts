@@ -17,8 +17,9 @@ export async function checkHealth(): Promise<boolean> {
   }
 }
 
-export async function fetchFormats(url: string, cookieMode: CookieMode): Promise<FormatListResponse> {
+export async function fetchFormats(url: string, cookieMode: CookieMode, proxy: string): Promise<FormatListResponse> {
   const params = new URLSearchParams({ url, cookieMode });
+  if (proxy.trim()) params.set('proxy', proxy.trim());
   const response = await fetch(`/api/formats?${params}`);
   return readJson<FormatListResponse>(response);
 }

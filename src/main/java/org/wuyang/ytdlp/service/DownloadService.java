@@ -73,11 +73,17 @@ public class DownloadService {
      * @return 格式列表响应
      */
     public FormatListResponse listFormats(String url, String cookieMode) {
+        return listFormats(url, cookieMode, null);
+    }
+
+    public FormatListResponse listFormats(String url, String cookieMode, String proxy) {
         log.info("event=formats.start url={} cookieMode={}", url, cookieMode);
         runner.resetState();
+        runner.setProxy(proxy);
+        potProvider.configureProxy(proxy);
         runner.setCookieMode(parseCookieMode(cookieMode));
 
-        List<Format> formats = fetchFormats(url, parseCookieMode(cookieMode));
+        List<Format> formats = fetchFormats(url, parseCookieMode(cookieMode), proxy);
         if (formats.isEmpty()) {
             log.warn("event=formats.empty url={} cookieMode={} lastClient={} potReady={}",
                 url, cookieMode, runner.lastClient(), potProvider.isReady());
@@ -111,10 +117,12 @@ public class DownloadService {
         log.info("event=download.start url={} mode={} cookieMode={} formatId={}",
             request.url(), request.mode(), request.cookieMode(), request.formatId());
         runner.resetState();
+        runner.setProxy(request.proxy());
+        potProvider.configureProxy(request.proxy());
         runner.setCookieMode(parseCookieMode(request.cookieMode()));
 
         // 获取格式列表
-        List<Format> formats = fetchFormats(request.url(), parseCookieMode(request.cookieMode()));
+        List<Format> formats = fetchFormats(request.url(), parseCookieMode(request.cookieMode()), request.proxy());
         if (formats.isEmpty()) {
             log.warn("event=download.formats_empty url={} mode={} lastClient={} potReady={}",
                     request.url(), request.mode(), runner.lastClient(), potProvider.isReady());
@@ -161,7 +169,7 @@ public class DownloadService {
      *
      * <p>依次尝试多个 YouTube player_client，合并去重后排序。</p>
      */
-    private List<Format> fetchFormats(String url, YtDlpRunner.CookieMode requestCookieMode) {
+    private List<Format> fetchFormats(String url, YtDlpRunner.CookieMode requestCookieMode, String proxy) {
         long startedAt = System.nanoTime();
         Map<String, Format> dedup = new LinkedHashMap<>();
         List<String> clients = List.of(props.youtube().clientArray()).stream()
@@ -169,7 +177,7 @@ public class DownloadService {
 
         ExecutorCompletionService<ClientFormats> completionService = new ExecutorCompletionService<>(formatExecutor);
         for (String client : clients) {
-            completionService.submit(() -> tryList(url, client, requestCookieMode));
+            completionService.submit(() -> tryList(url, client, requestCookieMode, proxy));
         }
         for (int completed = 0; completed < clients.size(); completed++) {
             try {
@@ -208,8 +216,9 @@ public class DownloadService {
     }
 
     /** 尝试用指定客户端获取格式列表 */
-    private ClientFormats tryList(String url, String client, YtDlpRunner.CookieMode requestCookieMode) {
+    private ClientFormats tryList(String url, String client, YtDlpRunner.CookieMode requestCookieMode, String proxy) {
         try {
+            runner.setProxy(proxy);
             runner.setCookieMode(requestCookieMode);
             String out = runner.getFormatInfoJson(url, client);
 

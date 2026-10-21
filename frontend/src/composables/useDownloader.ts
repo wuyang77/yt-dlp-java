@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   checkHealth,
   fetchDownloadTask,
@@ -7,7 +7,7 @@ import {
   pauseDownload,
   resumeDownload,
   startDownload,
-} from '@/services/api';
+} from '@/services';
 import type { CookieMode, DownloadMode, DownloadResponse, DownloadTask, MediaFormat } from '@/types/api';
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -16,6 +16,7 @@ function errorMessage(error: unknown, fallback: string): string {
 
 export function useDownloader() {
   const url = ref('');
+  const proxy = ref(localStorage.getItem('yt-dlp-proxy') || '');
   const cookieMode = ref<CookieMode>('FILE');
   const formats = ref<MediaFormat[]>([]);
   const selectedVideo = ref('');
@@ -34,7 +35,7 @@ export function useDownloader() {
   const videos = computed(() => formats.value.filter((item) => !item.audioOnly));
   const audios = computed(() => formats.value.filter((item) => item.audioOnly));
   const previewEmbedUrl = computed(() => previewVideoId.value
-    ? `https://www.youtube.com/embed/${previewVideoId.value}?autoplay=1&controls=1&playsinline=1&hl=zh-CN&cc_lang_pref=zh-Hans`
+    ? `https://www.youtube-nocookie.com/embed/${previewVideoId.value}?autoplay=1&controls=1&playsinline=1&hl=zh-CN&cc_lang_pref=zh-Hans&origin=${encodeURIComponent(window.location.origin)}`
     : '');
   const downloadReady = computed(() => downloadMode.value === 'VIDEO_ONLY'
     ? Boolean(selectedVideo.value)
@@ -81,6 +82,7 @@ export function useDownloader() {
       error.value = '无法识别该 YouTube 视频链接';
       return;
     }
+    // 恢复弹窗预览，使用 youtube-nocookie 域名避免嵌入限制
     error.value = '';
     previewOpen.value = true;
     previewVideoId.value = videoId;
@@ -98,7 +100,7 @@ export function useDownloader() {
     task.value = null;
     result.value = null;
     try {
-      const data = await fetchFormats(url.value, cookieMode.value);
+      const data = await fetchFormats(url.value, cookieMode.value, proxy.value);
       if (!data.success) throw new Error(data.message || '读取格式失败');
       formats.value = data.formats || [];
       selectedVideo.value = videos.value[0]?.id || '';
@@ -154,6 +156,7 @@ export function useDownloader() {
         mode: downloadMode.value,
         cookieMode: cookieMode.value,
         formatId,
+        proxy: proxy.value.trim(),
       });
       poll();
     } catch (cause) {
@@ -195,10 +198,12 @@ export function useDownloader() {
   onMounted(async () => {
     serviceOnline.value = await checkHealth();
   });
+  watch(proxy, (value) => localStorage.setItem('yt-dlp-proxy', value));
   onBeforeUnmount(() => clearTimeout(pollTimer));
 
   return {
     url,
+    proxy,
     cookieMode,
     formats,
     videos,
