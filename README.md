@@ -200,6 +200,7 @@ ytdlp:
 | `ytdlp.bin.ffmpeg` | String | `src/main/resources/ffmpeg.exe` | ffmpeg 二进制路径 |
 | `ytdlp.bin.cookies` | String | `src/main/resources/cookies.txt` | cookies 文件路径 |
 | `ytdlp.bin.node` | String | `D:/dev/nvm/nodejs/node.exe` | Node.js 路径，需根据实际安装位置修改 |
+| `ytdlp.http.proxy` | String | 空 | 可选 HTTP 代理地址，例如 `http://127.0.0.1:7890` |
 | `ytdlp.speech-recognition.whisper-cli` | String | `whisper-cli` | Whisper.cpp 命令行程序路径 |
 | `ytdlp.speech-recognition.model` | String | 空 | 多语言 Whisper 模型文件路径 |
 | `ytdlp.speech-recognition.parallelism` | int | `2` | 并发识别数，最大 4；提高会增加内存占用 |
@@ -209,6 +210,32 @@ ytdlp:
 | `ytdlp.download.retries` | int | `3` | 下载重试次数 |
 
 > **提示：** 可创建 `application-local.yml` 覆盖个人配置（已加入 `.gitignore`）。
+
+### 4.4 代理工具地址示例
+
+应用通过本机代理访问 YouTube。以下是可在对应代理工具中配置的本机 HTTP 或 mixed 代理地址示例；端口是示例值，不保证等于工具当前默认值。请先在工具中启用 HTTP/mixed 监听，并以工具实际显示的端口为准：
+
+| 代理工具 | 本机代理地址示例 |
+|----------|------------------|
+| Clash for Windows | `http://127.0.0.1:7890` |
+| Mihomo | `http://127.0.0.1:7890` |
+| Clash Verge Rev | `http://127.0.0.1:7897` |
+| v2rayN | `http://127.0.0.1:10809` |
+| NekoRay | `http://127.0.0.1:2081` |
+| Qv2ray | `http://127.0.0.1:8889` |
+| sing-box（启用 HTTP 入站） | `http://127.0.0.1:2080` |
+| Hiddify（启用本机 HTTP 代理） | `http://127.0.0.1:12334` |
+| Mieru（本项目启动脚本示例端口） | `http://127.0.0.1:3080` |
+
+在 `application.yml` 中设置服务端默认代理，例如：
+
+```yaml
+ytdlp:
+  http:
+    proxy: http://127.0.0.1:7890
+```
+
+也可以在 `application-local.yml` 中覆盖此配置。PO Token Provider 需要 HTTP 代理；如果工具只提供 SOCKS5，请启用 HTTP/mixed 监听后使用对应地址。Mieru 示例端口由本项目的启动脚本配置，其他代理工具的端口请按本机实际设置调整。
 
 ---
 
