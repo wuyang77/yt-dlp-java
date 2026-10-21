@@ -200,7 +200,7 @@ ytdlp:
 | `ytdlp.bin.ffmpeg` | String | `src/main/resources/ffmpeg.exe` | ffmpeg 二进制路径 |
 | `ytdlp.bin.cookies` | String | `src/main/resources/cookies.txt` | cookies 文件路径 |
 | `ytdlp.bin.node` | String | `D:/dev/nvm/nodejs/node.exe` | Node.js 路径，需根据实际安装位置修改 |
-| `ytdlp.http.proxy` | String | 空 | 可选 HTTP 代理地址，例如 `http://127.0.0.1:7890` |
+| `ytdlp.http.proxy` | String | `YTDLP_HTTP_PROXY` 环境变量 | 可选代理地址，支持 HTTP/Web 代理和 SOCKS5 代理 |
 | `ytdlp.speech-recognition.whisper-cli` | String | `whisper-cli` | Whisper.cpp 命令行程序路径 |
 | `ytdlp.speech-recognition.model` | String | 空 | 多语言 Whisper 模型文件路径 |
 | `ytdlp.speech-recognition.parallelism` | int | `2` | 并发识别数，最大 4；提高会增加内存占用 |
@@ -213,7 +213,7 @@ ytdlp:
 
 ### 4.4 代理工具地址示例
 
-应用通过本机代理访问 YouTube。以下是可在对应代理工具中配置的本机 HTTP 或 mixed 代理地址示例；端口是示例值，不保证等于工具当前默认值。请先在工具中启用 HTTP/mixed 监听，并以工具实际显示的端口为准：
+应用通过本机代理访问 YouTube。以下是可在对应代理工具中配置的本机 HTTP、SOCKS5 或 mixed 代理地址示例；端口是示例值，不保证等于工具当前默认值。请以工具实际显示的监听协议和端口为准：
 
 | 代理工具 | 本机代理地址示例 |
 |----------|------------------|
@@ -225,17 +225,19 @@ ytdlp:
 | Qv2ray | `http://127.0.0.1:8889` |
 | sing-box（启用 HTTP 入站） | `http://127.0.0.1:2080` |
 | Hiddify（启用本机 HTTP 代理） | `http://127.0.0.1:12334` |
-| Mieru（本项目启动脚本示例端口） | `http://127.0.0.1:3080` |
+| Mieru（本项目启动脚本示例端口） | `socks5h://127.0.0.1:3080` |
 
 在 `application.yml` 中设置服务端默认代理，例如：
 
 ```yaml
 ytdlp:
   http:
-    proxy: http://127.0.0.1:7890
+    proxy: socks5h://127.0.0.1:3080
 ```
 
-也可以在 `application-local.yml` 中覆盖此配置。PO Token Provider 需要 HTTP 代理；如果工具只提供 SOCKS5，请启用 HTTP/mixed 监听后使用对应地址。Mieru 示例端口由本项目的启动脚本配置，其他代理工具的端口请按本机实际设置调整。
+应用也会读取 `YTDLP_HTTP_PROXY` 环境变量；显式配置 `ytdlp.http.proxy` 时以配置文件为准。地址 scheme 用于选择代理协议：`http://` 表示 HTTP/Web 代理，`socks5://` 和 `socks5h://` 表示 SOCKS5 代理。`socks5h://` 将域名解析交给 SOCKS 代理。
+
+yt-dlp 使用指定的代理协议；Rust PO Token Provider 目前通过本机 HTTP CONNECT 转接器使用 SOCKS5 代理，因此不需要代理工具额外启用 HTTP 监听。转接器仅绑定回环地址。代理工具需在本机监听，且配置端口必须正确；无 scheme 的 `host:port` 地址按 HTTP 代理处理。
 
 ---
 

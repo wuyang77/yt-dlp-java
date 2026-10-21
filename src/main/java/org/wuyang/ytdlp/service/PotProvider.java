@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -24,6 +26,7 @@ import java.util.concurrent.TimeUnit;
  * PO Token Provider 管理器
  *
  * <p>负责 bgutil-ytdlp-pot-provider 二进制的下载、启动和健康检查。
+ * SOCKS5 配置通过仅监听本机的 HTTP CONNECT 转接器提供给不支持 SOCKS 的 Rust Provider。
  * 设计原则：先测端口 → 再启动 → 再 ping，确保"真连通"才算就绪。</p>
  *
  * <p>作为 Spring 单例 Bean 管理，通过构造器注入配置。</p>
@@ -42,8 +45,9 @@ public class PotProvider {
     private final int port;
     private final String downloadUrl;
     private final String baseUrl;
-    private final String defaultProxy;
-    private String proxy;
+    private final ProxyAddress defaultProxy;
+    private ProxyAddress proxy;
+    private SocksToHttpProxy socksProxyBridge;
 
     private Process process;
     private boolean ready = false;
@@ -53,29 +57,8 @@ public class PotProvider {
         this.port = props.pot().port();
         this.downloadUrl = props.pot().downloadUrl();
         this.baseUrl = "http://127.0.0.1:" + port;
-        this.defaultProxy = toHttpProxy(props.http().proxy());
+        this.defaultProxy = ProxyAddress.resolve(props.http().proxy());
         this.proxy = defaultProxy;
-    }
-
-    /**
-     * 将配置的代理地址转换为 Provider 子进程可用的 HTTP 代理地址。
-     *
-     * <p>Mieru 在同一端口同时支持 SOCKS5 与 HTTP 两种协议；bgutil-pot 的
-     * HTTP 客户端对 SOCKS 的支持取决于编译特性，而 HTTP 代理必定可用，
-     * 因此统一把 socks 开头的地址改写为 http 方案。未配置时返回 {@code null}。</p>
-     */
-    private static String toHttpProxy(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        String trimmed = raw.trim();
-        if (trimmed.regionMatches(true, 0, "socks", 0, 5)) {
-            int schemeEnd = trimmed.indexOf("://");
-            if (schemeEnd > 0) {
-                return "http" + trimmed.substring(schemeEnd);
-            }
-        }
-        return trimmed;
     }
 
     /** 获取 Provider 的 HTTP 基础 URL */
@@ -90,8 +73,8 @@ public class PotProvider {
 
     /** Apply the request's proxy to the provider process, falling back to the server default. */
     public synchronized void configureProxy(String requestProxy) {
-        String nextProxy = requestProxy == null || requestProxy.isBlank()
-                ? defaultProxy : toHttpProxy(requestProxy);
+        ProxyAddress nextProxy = requestProxy == null || requestProxy.isBlank()
+                ? defaultProxy : ProxyAddress.parse(requestProxy);
         if (Objects.equals(proxy, nextProxy)) {
             if (!ready) {
                 start();
@@ -113,7 +96,9 @@ public class PotProvider {
         }
         log.info("event=pot.binary_download_start url={} path={}", downloadUrl, exePath);
         try {
-            HttpURLConnection conn = (HttpURLConnection) URI.create(downloadUrl).toURL().openConnection();
+            HttpURLConnection conn = (HttpURLConnection) (proxy == null
+                    ? URI.create(downloadUrl).toURL().openConnection()
+                    : URI.create(downloadUrl).toURL().openConnection(downloadProxy()));
             conn.setInstanceFollowRedirects(true);
             try (InputStream in = conn.getInputStream();
                  OutputStream out = Files.newOutputStream(Path.of(exePath))) {
@@ -149,11 +134,11 @@ public class PotProvider {
             ProcessBuilder pb = new ProcessBuilder(
                     Path.of(exePath).toString(),
                     "server", "--host", "127.0.0.1", "--port", String.valueOf(port));
-            // Provider 需要访问 YouTube 的 BotGuard 接口，必须走代理；
-            // 通过标准环境变量把代理传递给子进程（其 HTTP 客户端会自动读取）
-            if (proxy != null) {
-                pb.environment().put("HTTPS_PROXY", proxy);
-                pb.environment().put("HTTP_PROXY", proxy);
+            String providerProxy = providerProxyUrl();
+            clearProxyEnvironment(pb);
+            if (providerProxy != null) {
+                pb.environment().put("HTTPS_PROXY", providerProxy);
+                pb.environment().put("HTTP_PROXY", providerProxy);
                 log.info("event=pot.proxy_configured");
             }
             pb.redirectErrorStream(true);
@@ -187,6 +172,42 @@ public class PotProvider {
         }
         process = null;
         ready = false;
+        if (socksProxyBridge != null) {
+            socksProxyBridge.close();
+            socksProxyBridge = null;
+        }
+    }
+
+    private String providerProxyUrl() throws IOException {
+        if (proxy == null) {
+            return null;
+        }
+        if (!proxy.isSocks5()) {
+            return proxy.value();
+        }
+        if (socksProxyBridge == null) {
+            socksProxyBridge = new SocksToHttpProxy(proxy.host(), proxy.port());
+        }
+        return socksProxyBridge.url();
+    }
+
+    private Proxy downloadProxy() throws IOException {
+        if (!proxy.isSocks5()) {
+            return proxy.toJavaProxy();
+        }
+        URI bridgeUri = URI.create(providerProxyUrl());
+        return new Proxy(Proxy.Type.HTTP,
+                InetSocketAddress.createUnresolved(bridgeUri.getHost(), bridgeUri.getPort()));
+    }
+
+    private static void clearProxyEnvironment(ProcessBuilder processBuilder) {
+        var environment = processBuilder.environment();
+        for (String name : new String[] {
+                "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+                "http_proxy", "https_proxy", "all_proxy"
+        }) {
+            environment.remove(name);
+        }
     }
 
     /** 应用关闭时自动停止 Provider，防止进程残留 */

@@ -24,9 +24,8 @@ import java.util.concurrent.TimeUnit;
  * 不阻塞 Spring Boot 启动流程。更新结果仅记录日志，失败不影响应用运行。</p>
  *
  * <p>通过 {@code ytdlp.auto-update.enabled} 开关控制，{@code ytdlp.auto-update.channel}
- * 选择更新通道（stable / nightly / master）。若配置了 {@code ytdlp.http.proxy}
- * （例如经 Mieru 启动脚本注入的 {@code YTDLP_HTTP_PROXY} 环境变量），
- * 更新请求也会走该代理。</p>
+ * 选择更新通道（stable / nightly / master）。更新请求使用 {@code ytdlp.http.proxy}
+ * 或环境变量 {@code YTDLP_HTTP_PROXY} 指定的代理。</p>
  *
  * @author wuyang
  */
@@ -44,7 +43,8 @@ public class YtDlpAutoUpdater implements ApplicationRunner {
 
     public YtDlpAutoUpdater(YtDlpProperties props) {
         this.ytDlpPath = props.bin().ytDlp();
-        this.proxy = props.http().proxy();
+        ProxyAddress configuredProxy = ProxyAddress.resolve(props.http().proxy());
+        this.proxy = configuredProxy == null ? null : configuredProxy.value();
         this.config = props.autoUpdate();
     }
 

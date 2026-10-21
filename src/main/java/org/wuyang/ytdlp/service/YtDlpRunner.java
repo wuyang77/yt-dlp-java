@@ -72,7 +72,8 @@ public class YtDlpRunner {
         this.referer = props.http().referer();
         this.nodePath = props.bin().node();
         this.pluginDir = locatePluginDir();
-        this.proxy = props.http().proxy();
+        ProxyAddress configuredProxy = ProxyAddress.resolve(props.http().proxy());
+        this.proxy = configuredProxy == null ? null : configuredProxy.value();
         this.downloadConfig = props.download();
         this.potProvider = potProvider;
     }
@@ -97,7 +98,7 @@ public class YtDlpRunner {
         if (proxy == null || proxy.isBlank()) {
             proxyOverride.remove();
         } else {
-            proxyOverride.set(proxy.trim());
+            proxyOverride.set(ProxyAddress.parse(proxy).value());
         }
     }
 
