@@ -8,6 +8,7 @@ export interface MediaFormat {
   vcodec: string;
   acodec: string;
   abr: string;
+  protocol: string;
   language: string;
   languageStatus: 'metadata' | 'detected' | 'not-configured' | 'unrecognized' | 'failed' | 'unavailable' | 'not-applicable';
   audioOnly: boolean;

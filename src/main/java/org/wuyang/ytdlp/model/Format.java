@@ -21,13 +21,14 @@ public record Format(
         String vcodec,
         String acodec,
         String abr,
+        String protocol,
         String language,
         String languageStatus,
         boolean audioOnly
 ) {
 
     public Format withLanguage(String detectedLanguage, String status) {
-        return new Format(id, ext, res, fps, size, tbr, vcodec, acodec, abr,
+        return new Format(id, ext, res, fps, size, tbr, vcodec, acodec, abr, protocol,
                 detectedLanguage, status, audioOnly);
     }
 

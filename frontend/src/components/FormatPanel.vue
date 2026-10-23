@@ -24,6 +24,10 @@ function displayLanguage(item: MediaFormat): string {
   }
 }
 
+function displayProtocol(protocol: string): string {
+  return protocol.toLowerCase().startsWith('m3u8') ? 'HLS' : protocol || '—';
+}
+
 defineProps<{
   formats: MediaFormat[];
   videos: MediaFormat[];
@@ -38,6 +42,6 @@ defineProps<{
       <div class="pick active"><div class="pick-top"><span class="pick-title">视频轨道</span><strong>▣</strong></div><select v-model="selectedVideo"><option v-for="item in videos" :key="item.id" :value="item.id">{{ item.id }} · {{ item.res }} · {{ item.tbr }}</option></select></div>
       <div class="pick active"><div class="pick-top"><span class="pick-title">音频轨道</span><strong>◖</strong></div><select v-model="selectedAudio"><option v-for="item in audios" :key="item.id" :value="item.id">{{ item.id }} · {{ displayLanguage(item) }} · {{ item.tbr }} · {{ item.acodec }}</option></select></div>
     </div>
-    <div class="table-wrap"><table><thead><tr><th>类型</th><th>编号</th><th>语言</th><th>容器</th><th>分辨率</th><th>码率</th><th>编码</th><th>大小</th></tr></thead><tbody><tr v-for="item in formats" :key="item.id + item.ext" :class="{chosen: item.id === selectedVideo || item.id === selectedAudio}"><td><span class="tag" :class="{video: !item.audioOnly}">{{ item.audioOnly ? '音频' : '视频' }}</span></td><td>{{ item.id }}</td><td>{{ item.audioOnly ? displayLanguage(item) : '—' }}</td><td>{{ item.ext }}</td><td>{{ item.res }}</td><td>{{ item.audioOnly ? item.abr : item.tbr }}</td><td>{{ item.audioOnly ? item.acodec : item.vcodec }}</td><td>{{ item.size }}</td></tr></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>类型</th><th>编号</th><th>语言</th><th>容器</th><th>协议</th><th>分辨率</th><th>码率</th><th>编码</th><th>大小</th></tr></thead><tbody><tr v-for="item in formats" :key="item.id + item.ext" :class="{chosen: item.id === selectedVideo || item.id === selectedAudio}"><td><span class="tag" :class="{video: !item.audioOnly}">{{ item.audioOnly ? '音频' : '视频' }}</span></td><td>{{ item.id }}</td><td>{{ item.audioOnly ? displayLanguage(item) : '—' }}</td><td>{{ item.ext }}</td><td>{{ displayProtocol(item.protocol) }}</td><td>{{ item.res }}</td><td>{{ item.audioOnly ? item.abr : item.tbr }}</td><td>{{ item.audioOnly ? item.acodec : item.vcodec }}</td><td>{{ item.size }}</td></tr></tbody></table></div>
   </div>
 </template>

@@ -76,7 +76,7 @@ public final class FormatParser {
                 res = audioOnly ? "audio only" : "unknown";
             }
 
-            list.add(new Format(id, ext, res, fps, size, tbr, vcodec, acodec, abr, "",
+            list.add(new Format(id, ext, res, fps, size, tbr, vcodec, acodec, abr, "", "",
                     audioOnly ? "unavailable" : "not-applicable", audioOnly));
         }
         return list;
@@ -95,19 +95,23 @@ public final class FormatParser {
 
             String vcodec = text(item, "vcodec");
             String acodec = text(item, "acodec");
-            boolean audioOnly = isMissingCodec(vcodec) && !isMissingCodec(acodec);
             String resolution = text(item, "resolution");
             if (resolution.isBlank()) {
                 String width = text(item, "width");
                 String height = text(item, "height");
                 resolution = !width.isBlank() && !height.isBlank()
-                        ? width + "x" + height : audioOnly ? "audio only" : "unknown";
+                        ? width + "x" + height : "";
+            }
+            boolean audioOnly = isAudioOnly(item, vcodec, acodec, resolution);
+            if (resolution.isBlank()) {
+                resolution = audioOnly ? "audio only" : "unknown";
             }
 
             String language = text(item, "language");
             boolean hasLanguage = !language.isBlank() && !language.equalsIgnoreCase("und");
             result.add(new Format(id, text(item, "ext"), resolution, text(item, "fps"),
                     size(item), bitrate(item, "tbr"), vcodec, acodec, bitrate(item, "abr"),
+                    text(item, "protocol"),
                     hasLanguage ? language : "",
                     audioOnly ? hasLanguage ? "metadata" : "unavailable" : "not-applicable",
                     audioOnly));
@@ -141,6 +145,30 @@ public final class FormatParser {
 
     private static boolean isMissingCodec(String codec) {
         return codec.isBlank() || codec.equalsIgnoreCase("none");
+    }
+
+    private static boolean isAudioOnly(JsonNode item, String vcodec, String acodec, String resolution) {
+        if (!isMissingCodec(vcodec)) return false;
+        String formatNote = text(item, "format_note");
+        if (isAudioOnlyLabel(resolution) || isAudioOnlyLabel(formatNote)) return true;
+        if (hasVideoResolution(resolution) || hasVideoResolution(formatNote)
+                || hasPositiveDimension(item, "width")
+                || hasPositiveDimension(item, "height")) return false;
+        return !isMissingCodec(acodec);
+    }
+
+    private static boolean isAudioOnlyLabel(String value) {
+        String normalized = value.toLowerCase(Locale.ROOT).replace('-', ' ');
+        return normalized.contains("audio only");
+    }
+
+    private static boolean hasVideoResolution(String resolution) {
+        return resolution.matches("(?i).*\\d{3,5}x\\d{3,5}.*")
+                || resolution.matches("(?i).*\\d{3,5}p.*");
+    }
+
+    private static boolean hasPositiveDimension(JsonNode item, String key) {
+        return item.path(key).asInt(0) > 0;
     }
 
     /** 在 tokens 中定位 "audio only" 后的起始索引 */

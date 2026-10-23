@@ -57,6 +57,33 @@ class FormatParserTest {
         assertEquals("metadata", formats.get(1).languageStatus());
         assertEquals("128k", formats.get(1).abr());
     }
+
+    @Test
+    void classifiesHlsFormatsFromTrackMetadataWhenCodecsAreMissing() throws Exception {
+        String json = """
+                {
+                  "formats": [
+                    {"format_id":"hls-audio","ext":"m4a","protocol":"m3u8_native",
+                     "format_note":"audio only","vcodec":"none","acodec":"none"},
+                    {"format_id":"hls-video","ext":"mp4","protocol":"m3u8_native",
+                     "width":1280,"height":720,"vcodec":"none","acodec":"none"},
+                    {"format_id":"hls-video-note","ext":"mp4","protocol":"m3u8_native",
+                     "format_note":"720p","vcodec":"none","acodec":"mp4a.40.2"}
+                  ]
+                }
+                """;
+
+        List<Format> formats = FormatParser.parseJson(json, JsonMapper.builder().build());
+
+        assertEquals(3, formats.size());
+        assertTrue(formats.get(0).audioOnly());
+        assertEquals("audio only", formats.get(0).res());
+        assertEquals("m3u8_native", formats.get(0).protocol());
+        assertFalse(formats.get(1).audioOnly());
+        assertEquals("1280x720", formats.get(1).res());
+        assertEquals("m3u8_native", formats.get(1).protocol());
+        assertFalse(formats.get(2).audioOnly());
+    }
 }
 
 class YtDlpPropertiesTest {
